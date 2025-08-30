@@ -284,6 +284,23 @@
             </div>
         </div>
         
+        <div class="quick-verse-input" style="margin: 20px 0; padding: 15px; background: var(--preview-bg); border-radius: 8px;">
+            <label for="quickVerseInput"><strong>Quick Verse Input:</strong></label>
+            <div style="position: relative;">
+                <input type="text" id="quickVerseInput" placeholder="Type: Genesis 1:16 or John 3:16" 
+                       style="width: 300px; margin: 5px 0;" 
+                       onkeypress="handleQuickVerseKeypress(event)"
+                       oninput="handleQuickVerseInput(event)"
+                       onkeydown="handleQuickVerseKeydown(event)"
+                       autocomplete="off">
+                <div id="quickVerseDropdown" class="autocomplete-dropdown" style="width: 300px; display: none;"></div>
+            </div>
+            <button onclick="parseQuickVerse()" class="verse-button" id="quickVerseGoBtn">Go</button>
+            <div id="quickVerseStatus" style="font-size: 12px; margin-top: 5px; min-height: 18px;">
+                Format: BookName Chapter:Verse (e.g., "Genesis 1:16", "1 John 3:16", "Psalm 23:1")
+            </div>
+        </div>
+        
         <div class="verse-navigation">
             <div></div>
             <button class="nav-button" onclick="previousVerse()" id="prevBtn" disabled>← Previous</button>
@@ -742,6 +759,37 @@
         function handleBooksResponse(bookList) {
             books = bookList;
             showBookDropdown(bookList);
+            
+            // Handle pending quick selection
+            if (pendingQuickSelection) {
+                const { bookName, chapter, verse } = pendingQuickSelection;
+                
+                // Find matching book (case insensitive, flexible matching)
+                const matchedBook = bookList.find(book => 
+                    book.toLowerCase().includes(bookName.toLowerCase()) ||
+                    bookName.toLowerCase().includes(book.toLowerCase())
+                );
+                
+                if (matchedBook) {
+                    // Set the book
+                    selectedBook = matchedBook;
+                    currentBook = matchedBook;
+                    document.getElementById('bookInput').value = matchedBook;
+                    
+                    // Request chapters for this book
+                    requestChapters(matchedBook);
+                    
+                    // Store the chapter and verse to select after chapters load
+                    pendingQuickSelection = { ...pendingQuickSelection, bookName: matchedBook };
+                } else {
+                    const status = document.getElementById('quickVerseStatus');
+                    if (status) {
+                        status.innerHTML = `❌ Book "${bookName}" not found. Please check the spelling.`;
+                        status.style.color = '#dc3545';
+                    }
+                    pendingQuickSelection = null;
+                }
+            }
         }
 
         function handleChaptersResponse(chapters) {
@@ -759,6 +807,31 @@
             document.getElementById('verseSelect').disabled = true;
             document.getElementById('verseSelect').innerHTML = '<option value="">Select verse</option>';
             hideVersePreview();
+            
+            // Handle pending quick selection
+            if (pendingQuickSelection) {
+                const { chapter, verse } = pendingQuickSelection;
+                
+                // Check if the requested chapter exists
+                if (chapters.includes(chapter)) {
+                    // Set the chapter
+                    selectedChapter = chapter;
+                    currentChapter = chapter;
+                    chapterSelect.value = chapter;
+                    
+                    // Request verses for this chapter
+                    requestVerses(selectedBook, chapter);
+                    
+                    // Keep the verse selection for when verses load
+                } else {
+                    const status = document.getElementById('quickVerseStatus');
+                    if (status) {
+                        status.innerHTML = `❌ Chapter ${chapter} not found in ${selectedBook}.`;
+                        status.style.color = '#dc3545';
+                    }
+                    pendingQuickSelection = null;
+                }
+            }
         }
 
         function handleVersesResponse(verses) {
@@ -774,6 +847,41 @@
             
             verseSelect.disabled = false;
             hideVersePreview();
+            
+            // Handle pending quick selection
+            if (pendingQuickSelection) {
+                const { verse } = pendingQuickSelection;
+                const status = document.getElementById('quickVerseStatus');
+                
+                // Check if the requested verse exists
+                if (verses.includes(verse)) {
+                    // Set the verse
+                    selectedVerse = verse;
+                    currentVerse = verse;
+                    verseSelect.value = verse;
+                    
+                    // Request the verse preview
+                    requestVersePreview(selectedBook, selectedChapter, verse);
+                    
+                    // Clear the quick input and show success
+                    document.getElementById('quickVerseInput').value = '';
+                    if (status) {
+                        status.innerHTML = '✅ Verse found and selected!';
+                        status.style.color = '#28a745';
+                        setTimeout(() => {
+                            status.innerHTML = 'Format: BookName Chapter:Verse (e.g., "Genesis 1:16", "1 John 3:16", "Psalm 23:1")';
+                            status.style.color = 'var(--text-color)';
+                        }, 2000);
+                    }
+                } else {
+                    if (status) {
+                        status.innerHTML = `❌ Verse ${verse} not found in ${selectedBook} ${selectedChapter}.`;
+                        status.style.color = '#dc3545';
+                    }
+                }
+                
+                pendingQuickSelection = null;
+            }
         }
 
         function handleSpeakersResponse(speakerList) {
@@ -1226,6 +1334,247 @@
                 updateNavigationButtons();
             }
         });
+
+        // Quick verse input functions
+        let quickVerseAutocompleteIndex = -1;
+        let quickVerseSuggestions = [];
+        
+        function handleQuickVerseKeypress(event) {
+            if (event.key === 'Enter') {
+                event.preventDefault();
+                if (quickVerseAutocompleteIndex >= 0 && quickVerseSuggestions.length > 0) {
+                    selectQuickVerseSuggestion(quickVerseSuggestions[quickVerseAutocompleteIndex]);
+                } else {
+                    parseQuickVerse();
+                }
+            }
+        }
+
+        function handleQuickVerseKeydown(event) {
+            const dropdown = document.getElementById('quickVerseDropdown');
+            if (dropdown.style.display === 'block') {
+                if (event.key === 'ArrowDown') {
+                    event.preventDefault();
+                    quickVerseAutocompleteIndex = Math.min(quickVerseAutocompleteIndex + 1, quickVerseSuggestions.length - 1);
+                    updateQuickVerseSelection();
+                } else if (event.key === 'ArrowUp') {
+                    event.preventDefault();
+                    quickVerseAutocompleteIndex = Math.max(quickVerseAutocompleteIndex - 1, -1);
+                    updateQuickVerseSelection();
+                } else if (event.key === 'Escape') {
+                    hideQuickVerseDropdown();
+                }
+            }
+        }
+
+        function handleQuickVerseInput(event) {
+            const input = event.target.value;
+            const status = document.getElementById('quickVerseStatus');
+            const goBtn = document.getElementById('quickVerseGoBtn');
+            
+            // Real-time validation and autocomplete
+            if (!input.trim()) {
+                status.innerHTML = 'Format: BookName Chapter:Verse (e.g., "Genesis 1:16", "1 John 3:16", "Psalm 23:1")';
+                status.style.color = 'var(--text-color)';
+                goBtn.disabled = false;
+                hideQuickVerseDropdown();
+                return;
+            }
+
+            // Check for valid characters only (letters, numbers, spaces, colon)
+            const validChars = /^[a-zA-Z0-9\s:]*$/;
+            if (!validChars.test(input)) {
+                status.innerHTML = '❌ Only letters, numbers, spaces, and colon (:) allowed';
+                status.style.color = '#dc3545';
+                goBtn.disabled = true;
+                hideQuickVerseDropdown();
+                return;
+            }
+
+            // Parse current input state
+            const colonIndex = input.indexOf(':');
+            const lastSpaceIndex = input.lastIndexOf(' ');
+            
+            if (colonIndex === -1) {
+                // Still typing book name or chapter
+                if (lastSpaceIndex === -1) {
+                    // Still typing book name
+                    showBookSuggestions(input);
+                    status.innerHTML = '💡 Type book name... (e.g., Genesis, John, Psalm)';
+                    status.style.color = 'var(--button-bg)';
+                    goBtn.disabled = true;
+                } else {
+                    // Has space, might be typing chapter
+                    const bookPart = input.substring(0, lastSpaceIndex);
+                    const chapterPart = input.substring(lastSpaceIndex + 1);
+                    
+                    if (!/^\d*$/.test(chapterPart)) {
+                        status.innerHTML = '❌ Chapter must be a number';
+                        status.style.color = '#dc3545';
+                        goBtn.disabled = true;
+                        hideQuickVerseDropdown();
+                    } else {
+                        showBookSuggestions(bookPart);
+                        status.innerHTML = `💡 Add colon and verse number (e.g., "${input}:1")`;
+                        status.style.color = 'var(--button-bg)';
+                        goBtn.disabled = true;
+                    }
+                }
+            } else {
+                // Has colon, check verse number
+                const beforeColon = input.substring(0, colonIndex);
+                const afterColon = input.substring(colonIndex + 1);
+                
+                if (!/^\d*$/.test(afterColon)) {
+                    status.innerHTML = '❌ Verse must be a number';
+                    status.style.color = '#dc3545';
+                    goBtn.disabled = true;
+                } else if (afterColon === '') {
+                    status.innerHTML = '💡 Type verse number';
+                    status.style.color = 'var(--button-bg)';
+                    goBtn.disabled = true;
+                } else {
+                    // Valid format
+                    const regex = /^(.+?)\s+(\d+):(\d+)$/;
+                    if (regex.test(input)) {
+                        status.innerHTML = '✅ Valid format! Press Enter or click Go';
+                        status.style.color = '#28a745';
+                        goBtn.disabled = false;
+                    } else {
+                        status.innerHTML = '💡 Almost there... (BookName Chapter:Verse)';
+                        status.style.color = 'var(--button-bg)';
+                        goBtn.disabled = true;
+                    }
+                }
+                hideQuickVerseDropdown();
+            }
+        }
+
+        function showBookSuggestions(input) {
+            if (!books || books.length === 0 || !input.trim()) {
+                hideQuickVerseDropdown();
+                return;
+            }
+
+            const filter = input.toLowerCase().trim();
+            const suggestions = books.filter(book => 
+                book.toLowerCase().includes(filter)
+            ).slice(0, 8); // Show max 8 suggestions
+
+            if (suggestions.length === 0) {
+                hideQuickVerseDropdown();
+                return;
+            }
+
+            quickVerseSuggestions = suggestions;
+            quickVerseAutocompleteIndex = -1;
+            
+            const dropdown = document.getElementById('quickVerseDropdown');
+            dropdown.innerHTML = '';
+            
+            suggestions.forEach((book, index) => {
+                const item = document.createElement('div');
+                item.className = 'autocomplete-item';
+                item.textContent = book;
+                item.addEventListener('click', () => selectQuickVerseSuggestion(book));
+                dropdown.appendChild(item);
+            });
+            
+            dropdown.style.display = 'block';
+        }
+
+        function selectQuickVerseSuggestion(book) {
+            const input = document.getElementById('quickVerseInput');
+            const currentValue = input.value;
+            const lastSpaceIndex = currentValue.lastIndexOf(' ');
+            
+            if (lastSpaceIndex === -1) {
+                // Replace entire input with book name
+                input.value = book + ' ';
+            } else {
+                // Replace just the book part
+                const afterSpace = currentValue.substring(lastSpaceIndex + 1);
+                if (/^\d/.test(afterSpace)) {
+                    // Keep the chapter part
+                    input.value = book + ' ' + afterSpace;
+                } else {
+                    // Replace the partial book name
+                    input.value = book + ' ';
+                }
+            }
+            
+            hideQuickVerseDropdown();
+            input.focus();
+            
+            // Trigger input event to update validation
+            const event = new Event('input', { bubbles: true });
+            input.dispatchEvent(event);
+        }
+
+        function updateQuickVerseSelection() {
+            const items = document.getElementById('quickVerseDropdown').children;
+            for (let i = 0; i < items.length; i++) {
+                items[i].classList.toggle('selected', i === quickVerseAutocompleteIndex);
+            }
+        }
+
+        function hideQuickVerseDropdown() {
+            document.getElementById('quickVerseDropdown').style.display = 'none';
+            quickVerseAutocompleteIndex = -1;
+            quickVerseSuggestions = [];
+        }
+
+        // Hide dropdown when clicking outside
+        document.addEventListener('click', function(event) {
+            const quickInput = document.getElementById('quickVerseInput');
+            const quickDropdown = document.getElementById('quickVerseDropdown');
+            if (!quickInput.contains(event.target) && !quickDropdown.contains(event.target)) {
+                hideQuickVerseDropdown();
+            }
+        });
+
+        function parseQuickVerse() {
+            const input = document.getElementById('quickVerseInput').value.trim();
+            const status = document.getElementById('quickVerseStatus');
+            
+            if (!input) return;
+
+            // Parse different formats like "Genesis 1:16", "1 John 3:16", "Psalm 23:1"
+            const regex = /^(.+?)\s+(\d+):(\d+)$/;
+            const match = input.match(regex);
+            
+            if (!match) {
+                status.innerHTML = '❌ Please use format: BookName Chapter:Verse (e.g., "Genesis 1:16")';
+                status.style.color = '#dc3545';
+                return;
+            }
+
+            const bookName = match[1].trim();
+            const chapter = parseInt(match[2]);
+            const verse = parseInt(match[3]);
+
+            // Show loading status
+            status.innerHTML = '🔍 Searching for verse...';
+            status.style.color = 'var(--button-bg)';
+
+            // Set the selections
+            selectBookByName(bookName, chapter, verse);
+        }
+
+        function selectBookByName(bookName, chapter, verse) {
+            // First, request all books to find a match
+            if (ws && ws.readyState === WebSocket.OPEN) {
+                ws.send(JSON.stringify({
+                    type: 'get_books',
+                    filter: ''
+                }));
+                
+                // Store the target for when books are received
+                pendingQuickSelection = { bookName, chapter, verse };
+            }
+        }
+
+        let pendingQuickSelection = null;
 
         // Connect on page load
         connect();
