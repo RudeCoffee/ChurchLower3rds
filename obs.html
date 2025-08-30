@@ -1,0 +1,74 @@
+<!DOCTYPE html>
+<head>
+
+    <style>
+        body {
+            margin: 0;
+            overflow: hidden;
+            background-color: transparent;
+        }
+        .bible {
+            position: absolute;
+            font-family: Arial, sans-serif;
+            color: white;
+            text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.7);
+            transition: opacity 1s ease-in-out;
+        }
+        #bibleBook {
+            top: 20px;
+            left: 20px;
+            font-size: 36px;
+            font-weight: bold;
+        }
+        #bibleVerse {
+            top: 60px;
+            left: 20px;
+            font-size: 24px;
+        }
+        #bibleBackground {
+            top: 10px;
+            left: 10px;
+            width: calc(100% - 20px);
+            height: 80px;
+            background-color: rgba(0, 0, 0, 0.5);
+            z-index: -1;
+        }
+        .speaker {
+            position: absolute;
+            font-family: Arial, sans-serif;
+            color: white;
+            text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.7);
+            transition: opacity 1s ease-in-out;
+        }
+        #speakerText {
+            bottom: 20px;
+            left: 20px;
+            font-size: 30px;
+            font-weight: bold;
+        }
+        #speakerBackground {
+            bottom: 10px;
+            left: 10px;
+            width: calc(100% - 20px);
+            height: 60px;
+            background-color: rgba(0, 0, 0, 0.5);
+            z-index: -1;
+        }
+
+    </style>
+
+
+</head>
+<body>
+    <div id="bibleBook" class="bible">book</div>
+    <div id="bibleVerse" class="bible">verse</div>
+    <div id="bibleBackground" class="bible"></div>
+    
+    <div id="speakerText" class="speaker">speaker</div>
+    <div id="speakerBackground" class="speaker"></div>
+
+    <script>
+        
+
+    </script>
+</body>
