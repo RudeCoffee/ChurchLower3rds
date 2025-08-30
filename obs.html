@@ -13,6 +13,7 @@
             color: white;
             text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.7);
             transition: opacity 1s ease-in-out;
+            opacity: 0;
         }
         #bibleBook {
             top: 20px;
@@ -39,6 +40,7 @@
             color: white;
             text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.7);
             transition: opacity 1s ease-in-out;
+            opacity: 0;
         }
         #speakerText {
             bottom: 20px;
@@ -54,21 +56,60 @@
             background-color: rgba(0, 0, 0, 0.5);
             z-index: -1;
         }
-
+        .visible {
+            opacity: 1 !important;
+        }
     </style>
 
 
 </head>
 <body>
-    <div id="bibleBook" class="bible">book</div>
-    <div id="bibleVerse" class="bible">verse</div>
+    <div id="bibleBook" class="bible">John 3:16</div>
+    <div id="bibleVerse" class="bible">For God so loved the world...</div>
     <div id="bibleBackground" class="bible"></div>
     
-    <div id="speakerText" class="speaker">speaker</div>
+    <div id="speakerText" class="speaker">Pastor John</div>
     <div id="speakerBackground" class="speaker"></div>
 
     <script>
+        const ws = new WebSocket('ws://localhost:8080/ws/obs');
         
-
+        ws.onmessage = function(event) {
+            const data = JSON.parse(event.data);
+            
+            if (data.type === 'bible') {
+                document.getElementById('bibleBook').textContent = data.book || '';
+                document.getElementById('bibleVerse').textContent = data.verse || '';
+                
+                const bibleElements = document.querySelectorAll('.bible');
+                if (data.show) {
+                    bibleElements.forEach(el => el.classList.add('visible'));
+                } else {
+                    bibleElements.forEach(el => el.classList.remove('visible'));
+                }
+            } else if (data.type === 'speaker') {
+                document.getElementById('speakerText').textContent = data.speaker || '';
+                
+                const speakerElements = document.querySelectorAll('.speaker');
+                if (data.show) {
+                    speakerElements.forEach(el => el.classList.add('visible'));
+                } else {
+                    speakerElements.forEach(el => el.classList.remove('visible'));
+                }
+            }
+        };
+        
+        ws.onopen = function() {
+            console.log('Connected to server');
+        };
+        
+        ws.onclose = function() {
+            console.log('Disconnected from server');
+            // Attempt to reconnect after 3 seconds
+            setTimeout(() => {
+                location.reload();
+            }, 3000);
+        };
     </script>
 </body>
+</html>

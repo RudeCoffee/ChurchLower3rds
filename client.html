@@ -1,7 +1,541 @@
 <!DOCTYPE html>
 <head>
-
+    <title>Church Lower 3rds Control</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        .container {
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            margin-bottom: 20px;
+        }
+        h1, h2 {
+            color: #333;
+            margin-top: 0;
+        }
+        .form-group {
+            margin-bottom: 15px;
+        }
+        label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: bold;
+        }
+        input, textarea, select {
+            width: 100%;
+            padding: 8px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            font-size: 14px;
+            box-sizing: border-box;
+        }
+        .verse-selector {
+            display: grid;
+            grid-template-columns: 2fr 1fr 1fr;
+            gap: 10px;
+            margin-bottom: 15px;
+        }
+        .autocomplete-container {
+            position: relative;
+        }
+        .autocomplete-dropdown {
+            position: absolute;
+            top: 100%;
+            left: 0;
+            right: 0;
+            background: white;
+            border: 1px solid #ddd;
+            border-top: none;
+            max-height: 200px;
+            overflow-y: auto;
+            z-index: 1000;
+            display: none;
+        }
+        .autocomplete-item {
+            padding: 8px;
+            cursor: pointer;
+            border-bottom: 1px solid #eee;
+        }
+        .autocomplete-item:hover {
+            background-color: #f8f9fa;
+        }
+        .autocomplete-item.selected {
+            background-color: #007cba;
+            color: white;
+        }
+        button {
+            background-color: #007cba;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 14px;
+            margin-right: 10px;
+        }
+        button:hover {
+            background-color: #005a87;
+        }
+        button:disabled {
+            background-color: #6c757d;
+            cursor: not-allowed;
+        }
+        button.hide {
+            background-color: #dc3545;
+        }
+        button.hide:hover {
+            background-color: #c82333;
+        }
+        .status {
+            padding: 10px;
+            border-radius: 4px;
+            margin-bottom: 20px;
+        }
+        .status.connected {
+            background-color: #d4edda;
+            color: #155724;
+            border: 1px solid #c3e6cb;
+        }
+        .status.disconnected {
+            background-color: #f8d7da;
+            color: #721c24;
+            border: 1px solid #f5c6cb;
+        }
+        .verse-preview {
+            background-color: #f8f9fa;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            padding: 15px;
+            margin-top: 15px;
+            display: none;
+        }
+        .verse-preview h3 {
+            margin-top: 0;
+            color: #007cba;
+        }
+        .verse-text {
+            font-style: italic;
+            line-height: 1.5;
+        }
+    </style>
 </head>
 <body>
+    <div class="status" id="status">Connecting...</div>
     
+    <div class="container">
+        <h1>Church Lower 3rds Control</h1>
+        
+        <h2>Bible Verse Display</h2>
+        <div class="verse-selector">
+            <div class="autocomplete-container">
+                <label for="bookInput">Book</label>
+                <input type="text" id="bookInput" placeholder="Type book name..." autocomplete="off">
+                <div class="autocomplete-dropdown" id="bookDropdown"></div>
+            </div>
+            
+            <div>
+                <label for="chapterSelect">Chapter</label>
+                <select id="chapterSelect" disabled>
+                    <option value="">Select chapter</option>
+                </select>
+            </div>
+            
+            <div>
+                <label for="verseSelect">Verse</label>
+                <select id="verseSelect" disabled>
+                    <option value="">Select verse</option>
+                </select>
+            </div>
+        </div>
+        
+        <div class="verse-preview" id="versePreview">
+            <h3 id="verseReference"></h3>
+            <div class="verse-text" id="verseText"></div>
+        </div>
+        
+        <button onclick="displayVerse()" id="displayBtn" disabled>Display Verse</button>
+        <button onclick="hideVerse()" class="hide">Hide Verse</button>
+    </div>
+    
+    <div class="container">
+        <h2>Speaker Name</h2>
+        <div class="form-group">
+            <label for="speakerInput">Speaker Name</label>
+            <input type="text" id="speakerInput" placeholder="Enter speaker name">
+        </div>
+        <button onclick="displaySpeaker()">Display Speaker</button>
+        <button onclick="hideSpeaker()" class="hide">Hide Speaker</button>
+    </div>
+    
+    <div class="container">
+        <h2>Text Search</h2>
+        <div class="form-group">
+            <label for="searchInput">Search Bible</label>
+            <input type="text" id="searchInput" placeholder="Search verses..." oninput="searchBible()">
+        </div>
+        <div class="search-results" id="searchResults" style="display: none;"></div>
+    </div>
+
+    <script>
+        let ws;
+        let selectedBook = '';
+        let selectedChapter = 0;
+        let selectedVerse = 0;
+        let currentAutocompleteIndex = -1;
+        let books = [];
+
+        function connect() {
+            ws = new WebSocket('ws://localhost:8080/ws/control');
+            
+            ws.onopen = function() {
+                console.log('Connected to server');
+                document.getElementById('status').className = 'status connected';
+                document.getElementById('status').textContent = 'Connected to server';
+                
+                // Load initial book list
+                requestBooks();
+            };
+            
+            ws.onclose = function() {
+                console.log('Disconnected from server');
+                document.getElementById('status').className = 'status disconnected';
+                document.getElementById('status').textContent = 'Disconnected from server - Retrying...';
+                setTimeout(connect, 3000);
+            };
+            
+            ws.onmessage = function(event) {
+                const data = JSON.parse(event.data);
+                
+                switch(data.type) {
+                    case 'books_response':
+                        handleBooksResponse(data.books);
+                        break;
+                    case 'chapters_response':
+                        handleChaptersResponse(data.chapters);
+                        break;
+                    case 'verses_response':
+                        handleVersesResponse(data.verses);
+                        break;
+                    case 'search_results':
+                        handleSearchResults(data.results);
+                        break;
+                    case 'verse_preview':
+                        showVersePreview(data.verse);
+                        break;
+                }
+            };
+        }
+
+        function requestBooks(filter = '') {
+            if (ws && ws.readyState === WebSocket.OPEN) {
+                ws.send(JSON.stringify({
+                    type: 'get_books',
+                    filter: filter
+                }));
+            }
+        }
+
+        function requestChapters(book) {
+            if (ws && ws.readyState === WebSocket.OPEN) {
+                ws.send(JSON.stringify({
+                    type: 'get_chapters',
+                    book: book
+                }));
+            }
+        }
+
+        function requestVerses(book, chapter) {
+            if (ws && ws.readyState === WebSocket.OPEN) {
+                ws.send(JSON.stringify({
+                    type: 'get_verses',
+                    book: book,
+                    chapter: chapter
+                }));
+            }
+        }
+
+        function requestVerse(book, chapter, verse) {
+            if (ws && ws.readyState === WebSocket.OPEN) {
+                ws.send(JSON.stringify({
+                    type: 'get_verse',
+                    book: book,
+                    chapter: chapter,
+                    verse: verse
+                }));
+            }
+        }
+
+        function requestVersePreview(book, chapter, verse) {
+            if (ws && ws.readyState === WebSocket.OPEN) {
+                ws.send(JSON.stringify({
+                    type: 'preview_verse',
+                    book: book,
+                    chapter: chapter,
+                    verse: verse
+                }));
+            }
+        }
+
+        function handleBooksResponse(bookList) {
+            books = bookList;
+            showBookDropdown(bookList);
+        }
+
+        function handleChaptersResponse(chapters) {
+            const chapterSelect = document.getElementById('chapterSelect');
+            chapterSelect.innerHTML = '<option value="">Select chapter</option>';
+            
+            chapters.forEach(chapter => {
+                const option = document.createElement('option');
+                option.value = chapter;
+                option.textContent = chapter;
+                chapterSelect.appendChild(option);
+            });
+            
+            chapterSelect.disabled = false;
+            document.getElementById('verseSelect').disabled = true;
+            document.getElementById('verseSelect').innerHTML = '<option value="">Select verse</option>';
+            hideVersePreview();
+        }
+
+        function handleVersesResponse(verses) {
+            const verseSelect = document.getElementById('verseSelect');
+            verseSelect.innerHTML = '<option value="">Select verse</option>';
+            
+            verses.forEach(verse => {
+                const option = document.createElement('option');
+                option.value = verse;
+                option.textContent = verse;
+                verseSelect.appendChild(option);
+            });
+            
+            verseSelect.disabled = false;
+            hideVersePreview();
+        }
+
+        function handleSearchResults(results) {
+            const searchResults = document.getElementById('searchResults');
+            searchResults.innerHTML = '';
+            
+            if (results.length > 0) {
+                searchResults.style.display = 'block';
+                results.forEach(result => {
+                    const div = document.createElement('div');
+                    div.className = 'search-result';
+                    div.innerHTML = `
+                        <div class="verse-reference">${result.book} ${result.chapter}:${result.verse}</div>
+                        <div class="verse-text">${result.text}</div>
+                    `;
+                    div.onclick = () => selectSearchResult(result);
+                    searchResults.appendChild(div);
+                });
+            } else {
+                searchResults.style.display = 'none';
+            }
+        }
+
+        function selectSearchResult(result) {
+            // Set the book, chapter, and verse selections
+            document.getElementById('bookInput').value = result.book;
+            selectedBook = result.book;
+            
+            // Request chapters for this book
+            requestChapters(result.book);
+            
+            // Set chapter and verse when chapters load
+            setTimeout(() => {
+                document.getElementById('chapterSelect').value = result.chapter;
+                selectedChapter = result.chapter;
+                
+                // Request verses for this chapter
+                requestVerses(result.book, result.chapter);
+                
+                // Set verse when verses load
+                setTimeout(() => {
+                    document.getElementById('verseSelect').value = result.verse;
+                    selectedVerse = result.verse;
+                    showVersePreview(result);
+                }, 100);
+            }, 100);
+            
+            hideBookDropdown();
+            document.getElementById('searchResults').style.display = 'none';
+        }
+
+        function showBookDropdown(bookList) {
+            const dropdown = document.getElementById('bookDropdown');
+            dropdown.innerHTML = '';
+            
+            bookList.forEach((book, index) => {
+                const div = document.createElement('div');
+                div.className = 'autocomplete-item';
+                if (index === currentAutocompleteIndex) {
+                    div.classList.add('selected');
+                }
+                div.textContent = book;
+                div.onclick = () => selectBook(book);
+                dropdown.appendChild(div);
+            });
+            
+            dropdown.style.display = bookList.length > 0 ? 'block' : 'none';
+        }
+
+        function hideBookDropdown() {
+            document.getElementById('bookDropdown').style.display = 'none';
+            currentAutocompleteIndex = -1;
+        }
+
+        function selectBook(book) {
+            document.getElementById('bookInput').value = book;
+            selectedBook = book;
+            hideBookDropdown();
+            
+            // Reset chapter and verse
+            document.getElementById('chapterSelect').innerHTML = '<option value="">Select chapter</option>';
+            document.getElementById('verseSelect').innerHTML = '<option value="">Select verse</option>';
+            document.getElementById('verseSelect').disabled = true;
+            hideVersePreview();
+            
+            // Request chapters for this book
+            requestChapters(book);
+        }
+
+        function showVersePreview(verse) {
+            document.getElementById('verseReference').textContent = `${verse.book} ${verse.chapter}:${verse.verse}`;
+            document.getElementById('verseText').textContent = verse.text;
+            document.getElementById('versePreview').style.display = 'block';
+            document.getElementById('displayBtn').disabled = false;
+        }
+
+        function hideVersePreview() {
+            document.getElementById('versePreview').style.display = 'none';
+            document.getElementById('displayBtn').disabled = true;
+        }
+
+        function searchBible() {
+            const query = document.getElementById('searchInput').value;
+            if (query.trim() && ws && ws.readyState === WebSocket.OPEN) {
+                ws.send(JSON.stringify({
+                    type: 'search',
+                    query: query
+                }));
+            } else {
+                document.getElementById('searchResults').style.display = 'none';
+            }
+        }
+
+        function displayVerse() {
+            if (selectedBook && selectedChapter && selectedVerse) {
+                requestVerse(selectedBook, selectedChapter, selectedVerse);
+            }
+        }
+
+        function hideVerse() {
+            if (ws && ws.readyState === WebSocket.OPEN) {
+                ws.send(JSON.stringify({
+                    type: 'bible',
+                    show: false
+                }));
+            }
+        }
+
+        function displaySpeaker() {
+            const speaker = document.getElementById('speakerInput').value;
+            if (speaker && ws && ws.readyState === WebSocket.OPEN) {
+                ws.send(JSON.stringify({
+                    type: 'speaker',
+                    speaker: speaker,
+                    show: true
+                }));
+            }
+        }
+
+        function hideSpeaker() {
+            if (ws && ws.readyState === WebSocket.OPEN) {
+                ws.send(JSON.stringify({
+                    type: 'speaker',
+                    show: false
+                }));
+            }
+        }
+
+        // Book input event handlers
+        document.getElementById('bookInput').addEventListener('input', function() {
+            const filter = this.value;
+            currentAutocompleteIndex = -1;
+            if (filter.trim()) {
+                requestBooks(filter);
+            } else {
+                hideBookDropdown();
+            }
+        });
+
+        document.getElementById('bookInput').addEventListener('keydown', function(e) {
+            const dropdown = document.getElementById('bookDropdown');
+            const items = dropdown.children;
+            
+            if (e.key === 'ArrowDown') {
+                e.preventDefault();
+                currentAutocompleteIndex = Math.min(currentAutocompleteIndex + 1, items.length - 1);
+                updateDropdownSelection();
+            } else if (e.key === 'ArrowUp') {
+                e.preventDefault();
+                currentAutocompleteIndex = Math.max(currentAutocompleteIndex - 1, -1);
+                updateDropdownSelection();
+            } else if (e.key === 'Enter') {
+                e.preventDefault();
+                if (currentAutocompleteIndex >= 0 && items[currentAutocompleteIndex]) {
+                    selectBook(items[currentAutocompleteIndex].textContent);
+                }
+            } else if (e.key === 'Escape') {
+                hideBookDropdown();
+            }
+        });
+
+        document.getElementById('bookInput').addEventListener('blur', function() {
+            // Delay hiding to allow click events
+            setTimeout(hideBookDropdown, 100);
+        });
+
+        function updateDropdownSelection() {
+            const items = document.getElementById('bookDropdown').children;
+            for (let i = 0; i < items.length; i++) {
+                items[i].classList.toggle('selected', i === currentAutocompleteIndex);
+            }
+        }
+
+        // Chapter select handler
+        document.getElementById('chapterSelect').addEventListener('change', function() {
+            selectedChapter = parseInt(this.value);
+            if (selectedChapter && selectedBook) {
+                requestVerses(selectedBook, selectedChapter);
+            } else {
+                document.getElementById('verseSelect').disabled = true;
+                document.getElementById('verseSelect').innerHTML = '<option value="">Select verse</option>';
+                hideVersePreview();
+            }
+        });
+
+        // Verse select handler  
+        document.getElementById('verseSelect').addEventListener('change', function() {
+            selectedVerse = parseInt(this.value);
+            if (selectedVerse && selectedBook && selectedChapter) {
+                // Request the actual verse text for preview
+                requestVersePreview(selectedBook, selectedChapter, selectedVerse);
+            } else {
+                hideVersePreview();
+            }
+        });
+
+        // Connect on page load
+        connect();
+    </script>
 </body>
+</html>
