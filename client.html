@@ -207,6 +207,20 @@
             margin-top: 0;
             color: var(--button-bg);
         }
+        .next-verse-preview {
+            background-color: var(--container-bg);
+            border: 1px solid #555;
+            border-radius: 4px;
+            padding: 12px;
+            margin-top: 10px;
+            display: none;
+            transition: background-color 0.3s, border-color 0.3s;
+            opacity: 0.8;
+        }
+        .next-verse-preview h4 {
+            margin: 0 0 8px 0;
+            font-size: 0.9em;
+        }
         .verse-text {
             font-style: italic;
             line-height: 1.5;
@@ -283,6 +297,12 @@
             <div class="verse-text" id="verseText"></div>
         </div>
         
+        <div class="next-verse-preview" id="nextVersePreview" style="display: none;">
+            <h4 style="color: #888; margin-bottom: 10px;">Next Verse Preview:</h4>
+            <h4 id="nextVerseReference" style="color: #aaa; font-size: 0.9em;"></h4>
+            <div class="verse-text" id="nextVerseText" style="color: #999; font-size: 0.85em; font-style: italic;"></div>
+        </div>
+        
         <button onclick="displayVerse()" id="displayBtn" disabled>Display Verse</button>
         <button onclick="hideVerse()" class="hide">Hide Verse</button>
     </div>
@@ -291,7 +311,10 @@
         <h2>Speaker Name</h2>
         <div class="form-group">
             <label for="speakerInput">Speaker Name</label>
-            <input type="text" id="speakerInput" placeholder="Enter speaker name">
+            <div class="autocomplete-container">
+                <input type="text" id="speakerInput" placeholder="Enter speaker name" oninput="filterSpeakers()" onkeydown="handleSpeakerKeydown(event)">
+                <div class="autocomplete-dropdown" id="speakerDropdown"></div>
+            </div>
         </div>
         <button onclick="displaySpeaker()">Display Speaker</button>
         <button onclick="hideSpeaker()" class="hide">Hide Speaker</button>
@@ -313,8 +336,15 @@
         let selectedVerse = 0;
         let currentAutocompleteIndex = -1;
         let books = [];
+        let speakers = [];
+        let currentSpeakerIndex = -1;
         let currentBookData = null;
         let currentVerseData = null;
+        
+        // Additional variables for consistency
+        let currentBook = '';
+        let currentChapter = 0;
+        let currentVerse = 0;
 
         // Theme toggle function
         function toggleTheme() {
@@ -353,85 +383,153 @@
 
         // Navigation functions
         function previousVerse() {
-            if (!currentBookData || !selectedBook || selectedChapter === 0 || selectedVerse === 0) return;
+            console.log('previousVerse called:', {
+                selectedBook,
+                selectedChapter,
+                selectedVerse
+            });
+            
+            if (!selectedBook || selectedChapter === 0 || selectedVerse === 0) {
+                console.log('Cannot go to previous verse - missing selection');
+                return;
+            }
             
             if (selectedVerse > 1) {
                 // Previous verse in same chapter
+                console.log('Going to previous verse in same chapter');
                 selectVerse(selectedBook, selectedChapter, selectedVerse - 1);
-            } else if (selectedChapter > 1) {
-                // Last verse of previous chapter
-                const prevChapter = selectedChapter - 1;
-                const prevChapterVerses = currentBookData.chapters[prevChapter - 1].length;
-                selectVerse(selectedBook, prevChapter, prevChapterVerses);
             } else {
-                // Last verse of last chapter of previous book
-                const currentBookIndex = books.findIndex(book => book.abbrev === selectedBook || book.name === selectedBook);
-                if (currentBookIndex > 0) {
-                    const prevBook = books[currentBookIndex - 1];
-                    const lastChapter = prevBook.chapters.length;
-                    const lastVerse = prevBook.chapters[lastChapter - 1].length;
-                    selectVerse(prevBook.abbrev, lastChapter, lastVerse);
-                }
+                console.log('At beginning of chapter');
             }
         }
 
         function nextVerse() {
-            if (!currentBookData || !selectedBook || selectedChapter === 0 || selectedVerse === 0) return;
+            console.log('nextVerse called:', {
+                selectedBook,
+                selectedChapter,
+                selectedVerse
+            });
             
-            const currentChapterVerses = currentBookData.chapters[selectedChapter - 1].length;
+            if (!selectedBook || selectedChapter === 0 || selectedVerse === 0) {
+                console.log('Cannot go to next verse - missing selection');
+                return;
+            }
             
-            if (selectedVerse < currentChapterVerses) {
-                // Next verse in same chapter
-                selectVerse(selectedBook, selectedChapter, selectedVerse + 1);
-            } else if (selectedChapter < currentBookData.chapters.length) {
-                // First verse of next chapter
-                selectVerse(selectedBook, selectedChapter + 1, 1);
-            } else {
-                // First verse of first chapter of next book
-                const currentBookIndex = books.findIndex(book => book.abbrev === selectedBook || book.name === selectedBook);
-                if (currentBookIndex < books.length - 1) {
-                    const nextBook = books[currentBookIndex + 1];
-                    selectVerse(nextBook.abbrev, 1, 1);
-                }
+            // Request the next verse (server will handle chapter boundaries)
+            console.log('Requesting next verse from server');
+            
+            // Send a special request to get the next verse
+            if (ws && ws.readyState === WebSocket.OPEN) {
+                ws.send(JSON.stringify({
+                    type: 'get_next_verse',
+                    book: selectedBook,
+                    chapter: selectedChapter,
+                    verse: selectedVerse
+                }));
             }
         }
 
+        function previousVerse() {
+            console.log('previousVerse called:', {
+                selectedBook,
+                selectedChapter,
+                selectedVerse
+            });
+            
+            if (!selectedBook || selectedChapter === 0 || selectedVerse <= 1) {
+                console.log('Cannot go to previous verse - at beginning or missing selection');
+                return;
+            }
+            
+            // Go to previous verse
+            const prevVerseNum = selectedVerse - 1;
+            console.log('Attempting to go to previous verse:', prevVerseNum);
+            
+            // Update the selection
+            selectedVerse = prevVerseNum;
+            currentVerse = prevVerseNum;
+            
+            // Update the verse selector
+            const verseSelect = document.getElementById('verseSelect');
+            verseSelect.value = prevVerseNum;
+            
+            // Request the verse AND display it on OBS (not just preview)
+            requestVerse(selectedBook, selectedChapter, prevVerseNum);
+            
+            // Also get preview for the client interface
+            requestVersePreview(selectedBook, selectedChapter, prevVerseNum);
+            
+            updateNavigationButtons();
+        }
+
         function selectVerse(book, chapter, verse) {
+            console.log('selectVerse called:', { book, chapter, verse });
+            
             selectedBook = book;
             selectedChapter = chapter;
             selectedVerse = verse;
             
-            // Update the book selector
+            // Update global current variables
+            currentBook = book;
+            currentChapter = chapter;
+            currentVerse = verse;
+            
+            // Find the book data
+            const foundBook = books.find(b => b.abbrev === book || b.name === book);
+            if (!foundBook) {
+                console.error('Book not found:', book);
+                return;
+            }
+            
+            // Update the book input field
             const bookInput = document.getElementById('bookInput');
+            bookInput.value = foundBook.name;
+            
+            // Update the chapter selector
+            const chapterSelect = document.getElementById('chapterSelect');
+            chapterSelect.value = chapter;
+            chapterSelect.disabled = false;
+            
+            // Update the verse selector  
+            const verseSelect = document.getElementById('verseSelect');
+            verseSelect.value = verse;
+            verseSelect.disabled = false;
+            
+            // Request and preview the verse
+            console.log('Requesting verse preview for:', foundBook.abbrev || foundBook.name, chapter, verse);
+            requestVersePreview(foundBook.abbrev || foundBook.name, chapter, verse);
+        }
+
+        function extractBookFromName(verseName) {
+            // Extract book name from verse name like "Genesis 1:2"
+            if (verseName && verseName.includes(' ')) {
+                const parts = verseName.split(' ');
+                // Return everything except the last part (which is chapter:verse)
+                return parts.slice(0, -1).join(' ');
+            }
+            return selectedBook; // Fallback to current book
+        }
+
+        function updateUIForNewVerse(book, chapter, verse) {
+            // Update book input
             const foundBook = books.find(b => b.abbrev === book || b.name === book);
             if (foundBook) {
+                const bookInput = document.getElementById('bookInput');
                 bookInput.value = foundBook.name;
-                currentBookData = foundBook;
-                
-                // Request chapters for this book
-                requestChapters(foundBook.abbrev);
-                
-                // Update chapter selector
-                setTimeout(() => {
-                    const chapterSelect = document.getElementById('chapterSelect');
-                    chapterSelect.value = chapter;
-                    chapterSelect.disabled = false;
-                    
-                    // Request verses for this chapter
-                    requestVerses(foundBook.abbrev, chapter);
-                    
-                    // Update verse selector
-                    setTimeout(() => {
-                        const verseSelect = document.getElementById('verseSelect');
-                        verseSelect.value = verse;
-                        verseSelect.disabled = false;
-                        
-                        // Get and preview the verse
-                        requestVersePreview(foundBook.abbrev, chapter, verse);
-                        updateNavigationButtons();
-                    }, 100);
-                }, 100);
             }
+            
+            // Update chapter selector
+            const chapterSelect = document.getElementById('chapterSelect');
+            chapterSelect.value = chapter;
+            chapterSelect.disabled = false;
+            
+            // Update verse selector
+            const verseSelect = document.getElementById('verseSelect');
+            verseSelect.value = verse;
+            verseSelect.disabled = false;
+            
+            // Update navigation buttons
+            updateNavigationButtons();
         }
 
         function updateNavigationButtons() {
@@ -440,13 +538,12 @@
             const currentRef = document.getElementById('currentVerseRef');
             
             console.log('updateNavigationButtons called:', {
-                currentBookData: !!currentBookData,
                 selectedBook,
                 selectedChapter,
                 selectedVerse
             });
             
-            if (!currentBookData || !selectedBook || selectedChapter === 0 || selectedVerse === 0) {
+            if (!selectedBook || selectedChapter === 0 || selectedVerse === 0) {
                 prevBtn.disabled = true;
                 nextBtn.disabled = true;
                 currentRef.textContent = 'Select a verse';
@@ -454,29 +551,29 @@
                 return;
             }
             
-            const foundBook = books.find(b => b.abbrev === selectedBook || b.name === selectedBook);
-            if (foundBook) {
-                currentRef.textContent = `${foundBook.name} ${selectedChapter}:${selectedVerse}`;
-            }
+            // Update the current reference display
+            currentRef.textContent = `Current: ${selectedBook} ${selectedChapter}:${selectedVerse}`;
             
-            // Check if previous verse exists
-            const currentBookIndex = books.findIndex(book => book.abbrev === selectedBook || book.name === selectedBook);
-            const canGoPrev = !(currentBookIndex === 0 && selectedChapter === 1 && selectedVerse === 1);
+            // Enable/disable buttons based on simple logic
+            const canGoPrev = selectedVerse > 1;
             prevBtn.disabled = !canGoPrev;
             
-            // Check if next verse exists
-            const currentChapterVerses = currentBookData.chapters[selectedChapter - 1].length;
-            const isLastVerseOfChapter = selectedVerse === currentChapterVerses;
-            const isLastChapter = selectedChapter === currentBookData.chapters.length;
-            const isLastBook = currentBookIndex === books.length - 1;
-            const canGoNext = !(isLastVerseOfChapter && isLastChapter && isLastBook);
-            nextBtn.disabled = !canGoNext;
+            // Update button text to show next/previous verse numbers
+            if (canGoPrev) {
+                prevBtn.textContent = `← ${selectedBook} ${selectedChapter}:${selectedVerse - 1}`;
+            } else {
+                prevBtn.textContent = '← Previous Verse';
+            }
+            
+            // For next button, always enable it and show next verse number
+            nextBtn.disabled = false;
+            nextBtn.textContent = `${selectedBook} ${selectedChapter}:${selectedVerse + 1} →`;
             
             console.log('Navigation buttons updated:', {
                 canGoPrev,
-                canGoNext,
                 prevDisabled: prevBtn.disabled,
-                nextDisabled: nextBtn.disabled
+                nextDisabled: nextBtn.disabled,
+                nextVerse: selectedVerse + 1
             });
         }
 
@@ -490,6 +587,9 @@
                 
                 // Load initial book list
                 requestBooks();
+                
+                // Load speakers list
+                requestSpeakers();
             };
             
             ws.onclose = function() {
@@ -516,7 +616,54 @@
                         handleSearchResults(data.results);
                         break;
                     case 'verse_preview':
-                        showVersePreview(data.verse);
+                        if (data.verse) {
+                            showVersePreview(data.verse);
+                        } else {
+                            console.log('Verse not found, cannot navigate further');
+                            // Revert the verse selection if the verse doesn't exist
+                            if (selectedVerse > 1) {
+                                selectedVerse = selectedVerse - 1;
+                                currentVerse = selectedVerse;
+                                // Update the verse selector back
+                                const verseSelect = document.getElementById('verseSelect');
+                                verseSelect.value = selectedVerse;
+                            }
+                        }
+                        break;
+                    case 'next_verse_preview':
+                        if (data.verse) {
+                            showNextVersePreview(data.verse);
+                        } else {
+                            hideNextVersePreview();
+                        }
+                        break;
+                    case 'next_verse_response':
+                        if (data.verse) {
+                            // Successfully got next verse, update our current selection
+                            const verse = data.verse;
+                            console.log('Received next verse:', verse);
+                            
+                            // Update selection variables
+                            selectedBook = extractBookFromName(verse.name);
+                            selectedChapter = verse.chapter;
+                            selectedVerse = verse.verse;
+                            currentBook = selectedBook;
+                            currentChapter = selectedChapter;
+                            currentVerse = selectedVerse;
+                            
+                            // Update UI selectors
+                            updateUIForNewVerse(selectedBook, selectedChapter, selectedVerse);
+                            
+                            // Show verse preview
+                            showVersePreview(verse);
+                            
+                            console.log('Navigation successful to:', selectedBook, selectedChapter, selectedVerse);
+                        } else {
+                            console.log('No next verse available (end of book?)');
+                        }
+                        break;
+                    case 'speakers_response':
+                        handleSpeakersResponse(data.speakers);
                         break;
                 }
             };
@@ -572,6 +719,26 @@
             }
         }
 
+        function requestNextVersePreview(book, chapter, verse) {
+            if (ws && ws.readyState === WebSocket.OPEN) {
+                ws.send(JSON.stringify({
+                    type: 'preview_next_verse',
+                    book: book,
+                    chapter: chapter,
+                    verse: verse
+                }));
+            }
+        }
+
+        function requestSpeakers(filter = '') {
+            if (ws && ws.readyState === WebSocket.OPEN) {
+                ws.send(JSON.stringify({
+                    type: 'get_speakers',
+                    filter: filter
+                }));
+            }
+        }
+
         function handleBooksResponse(bookList) {
             books = bookList;
             showBookDropdown(bookList);
@@ -609,6 +776,86 @@
             hideVersePreview();
         }
 
+        function handleSpeakersResponse(speakerList) {
+            speakers = speakerList;
+            showSpeakerDropdown(speakerList);
+        }
+
+        function showSpeakerDropdown(speakerList) {
+            const dropdown = document.getElementById('speakerDropdown');
+            dropdown.innerHTML = '';
+            
+            if (speakerList.length === 0) {
+                dropdown.style.display = 'none';
+                return;
+            }
+            
+            speakerList.slice(0, 10).forEach((speaker, index) => {
+                const item = document.createElement('div');
+                item.className = 'autocomplete-item';
+                item.textContent = speaker;
+                item.addEventListener('click', () => {
+                    selectSpeaker(speaker);
+                });
+                dropdown.appendChild(item);
+            });
+            
+            dropdown.style.display = 'block';
+            currentSpeakerIndex = -1;
+        }
+
+        function selectSpeaker(speaker) {
+            document.getElementById('speakerInput').value = speaker;
+            document.getElementById('speakerDropdown').style.display = 'none';
+            currentSpeakerIndex = -1;
+        }
+
+        function filterSpeakers() {
+            const input = document.getElementById('speakerInput');
+            const filter = input.value;
+            
+            if (filter.length > 0) {
+                requestSpeakers(filter);
+            } else {
+                document.getElementById('speakerDropdown').style.display = 'none';
+            }
+        }
+
+        function handleSpeakerKeydown(event) {
+            const dropdown = document.getElementById('speakerDropdown');
+            const items = dropdown.getElementsByClassName('autocomplete-item');
+            
+            if (event.key === 'ArrowDown') {
+                event.preventDefault();
+                currentSpeakerIndex = Math.min(currentSpeakerIndex + 1, items.length - 1);
+                updateSpeakerSelection(items);
+            } else if (event.key === 'ArrowUp') {
+                event.preventDefault();
+                currentSpeakerIndex = Math.max(currentSpeakerIndex - 1, -1);
+                updateSpeakerSelection(items);
+            } else if (event.key === 'Enter') {
+                event.preventDefault();
+                if (currentSpeakerIndex >= 0 && items[currentSpeakerIndex]) {
+                    selectSpeaker(items[currentSpeakerIndex].textContent);
+                }
+            } else if (event.key === 'Escape') {
+                dropdown.style.display = 'none';
+                currentSpeakerIndex = -1;
+            }
+        }
+
+        function updateSpeakerSelection(items) {
+            Array.from(items).forEach((item, index) => {
+                if (index === currentSpeakerIndex) {
+                    item.style.backgroundColor = 'var(--button-bg)';
+                    item.style.color = 'white';
+                } else {
+                    item.style.backgroundColor = '';
+                    item.style.color = '';
+                }
+            });
+        }
+
         function handleSearchResults(results) {
             const searchResults = document.getElementById('searchResults');
             searchResults.innerHTML = '';
@@ -618,8 +865,19 @@
                 results.forEach(result => {
                     const div = document.createElement('div');
                     div.className = 'search-result';
+                    
+                    // Handle new structure where result.name contains the reference
+                    let verseReference;
+                    if (result.name) {
+                        verseReference = result.name;
+                    } else if (result.book) {
+                        verseReference = `${result.book} ${result.chapter}:${result.verse}`;
+                    } else {
+                        verseReference = `Chapter ${result.chapter}:${result.verse}`;
+                    }
+                    
                     div.innerHTML = `
-                        <div class="verse-reference">${result.book} ${result.chapter}:${result.verse}</div>
+                        <div class="verse-reference">${verseReference}</div>
                         <div class="verse-text">${result.text}</div>
                     `;
                     div.onclick = () => selectSearchResult(result);
@@ -631,26 +889,48 @@
         }
 
         function selectSearchResult(result) {
+            // Extract book name from result.name (e.g., "John 3:16" -> "John")
+            let bookName;
+            if (result.name) {
+                // Parse the book name from the reference string
+                const parts = result.name.split(' ');
+                // Handle cases like "I John 3:16", "II Peter 1:1", etc.
+                if (parts.length >= 2 && (parts[0] === 'I' || parts[0] === 'II' || parts[0] === 'III')) {
+                    bookName = parts[0] + ' ' + parts[1];
+                } else {
+                    bookName = parts[0];
+                }
+            } else if (result.book) {
+                bookName = result.book;
+            } else {
+                console.error('No book name found in search result');
+                return;
+            }
+            
             // Set the book, chapter, and verse selections
-            document.getElementById('bookInput').value = result.book;
-            selectedBook = result.book;
+            document.getElementById('bookInput').value = bookName;
+            selectedBook = bookName;
+            currentBook = bookName;
             
             // Request chapters for this book
-            requestChapters(result.book);
+            requestChapters(bookName);
             
             // Set chapter and verse when chapters load
             setTimeout(() => {
                 document.getElementById('chapterSelect').value = result.chapter;
                 selectedChapter = result.chapter;
+                currentChapter = result.chapter;
                 
                 // Request verses for this chapter
-                requestVerses(result.book, result.chapter);
+                requestVerses(bookName, result.chapter);
                 
                 // Set verse when verses load
                 setTimeout(() => {
                     document.getElementById('verseSelect').value = result.verse;
                     selectedVerse = result.verse;
+                    currentVerse = result.verse;
                     showVersePreview(result);
+                    updateNavigationButtons();
                 }, 100);
             }, 100);
             
@@ -681,39 +961,148 @@
             currentAutocompleteIndex = -1;
         }
 
-        function selectBook(book) {
-            document.getElementById('bookInput').value = book;
-            selectedBook = book;
-            selectedChapter = 0; // Reset chapter
-            selectedVerse = 0; // Reset verse
-            hideBookDropdown();
+        function displayBookSuggestions(books) {
+            const bookDropdown = document.getElementById('bookDropdown');
+            if (books.length === 0) {
+                bookDropdown.innerHTML = '<div class="dropdown-item">No books found</div>';
+            } else {
+                bookDropdown.innerHTML = books.map(book => 
+                    `<div class="dropdown-item" onclick="selectBook('${book}')">${book}</div>`
+                ).join('');
+            }
+            bookDropdown.style.display = 'block';
+        }
+
+        function selectBook(bookName) {
+            console.log('Selecting book:', bookName); // Debug log
+            if (!bookName || bookName === 'undefined') {
+                console.error('Invalid book name:', bookName);
+                return;
+            }
             
-            // Reset chapter and verse
-            document.getElementById('chapterSelect').innerHTML = '<option value="">Select chapter</option>';
-            document.getElementById('verseSelect').innerHTML = '<option value="">Select verse</option>';
-            document.getElementById('verseSelect').disabled = true;
-            hideVersePreview();
-            updateNavigationButtons();
+            const bookDropdown = document.getElementById('bookDropdown');
+            document.getElementById('bookInput').value = bookName;
+            bookDropdown.style.display = 'none';
             
-            // Store current book data
-            currentBookData = books.find(b => b.abbrev === book || b.name === book);
+            currentBook = bookName;
+            selectedBook = bookName;
+            currentChapter = 0;
+            selectedChapter = 0;
+            currentVerse = 0;
+            selectedVerse = 0;
+            currentBookData = null;
+            
+            // Reset chapter and verse dropdowns
+            document.getElementById('chapterSelect').innerHTML = '<option value="">Select Chapter</option>';
+            document.getElementById('verseSelect').innerHTML = '<option value="">Select Verse</option>';
             
             // Request chapters for this book
-            requestChapters(book);
+            const message = {
+                type: 'get_chapters',
+                book: bookName
+            };
+            
+            ws.send(JSON.stringify(message));
+            updateNavigationButtons();
         }
 
         function showVersePreview(verse) {
-            document.getElementById('verseReference').textContent = `${verse.book} ${verse.chapter}:${verse.verse}`;
+            // Always show book, chapter, and verse information clearly
+            let verseReference;
+            let bookName = selectedBook;
+            let chapterNum = verse.chapter || selectedChapter;
+            let verseNum = verse.verse || selectedVerse;
+            
+            // Handle both old format (with book property) and new format (with name property)
+            if (verse.name) {
+                verseReference = verse.name; // Use the name field from new JSON structure
+                // Extract book name from the name field if available
+                const nameParts = verse.name.split(' ');
+                if (nameParts.length >= 2) {
+                    const refPart = nameParts[nameParts.length - 1]; // Get the last part (chapter:verse)
+                    bookName = nameParts.slice(0, -1).join(' '); // Everything except the last part
+                }
+            } else if (verse.book) {
+                verseReference = `${verse.book} ${chapterNum}:${verseNum}`;
+                bookName = verse.book;
+            } else {
+                verseReference = `${bookName} ${chapterNum}:${verseNum}`;
+            }
+            
+            // Store current verse data for display
+            currentVerseData = verse;
+            
+            // Update the preview display with clear formatting
+            document.getElementById('verseReference').textContent = verseReference;
             document.getElementById('verseText').textContent = verse.text;
             document.getElementById('versePreview').style.display = 'block';
             document.getElementById('displayBtn').disabled = false;
+            
+            // Update the current verse reference in navigation area
+            const currentRef = document.getElementById('currentVerseRef');
+            if (currentRef) {
+                currentRef.textContent = `Current: ${bookName} ${chapterNum}:${verseNum}`;
+            }
+            
+            console.log('Verse preview updated:', {
+                reference: verseReference,
+                book: bookName,
+                chapter: chapterNum,
+                verse: verseNum,
+                text: verse.text.substring(0, 50) + '...'
+            });
+            
             // Update navigation buttons when verse is shown
             updateNavigationButtons();
+            
+            // Request next verse preview automatically
+            if (selectedBook && selectedChapter && selectedVerse) {
+                requestNextVersePreview(selectedBook, selectedChapter, selectedVerse);
+            }
         }
 
         function hideVersePreview() {
             document.getElementById('versePreview').style.display = 'none';
             document.getElementById('displayBtn').disabled = true;
+            hideNextVersePreview();
+        }
+
+        function showNextVersePreview(verse) {
+            // Extract verse information
+            let verseReference;
+            let bookName = selectedBook;
+            let chapterNum = verse.chapter || selectedChapter;
+            let verseNum = verse.verse || selectedVerse;
+            
+            // Handle both old format (with book property) and new format (with name property)
+            if (verse.name) {
+                verseReference = verse.name;
+                // Extract book name from the name field if available
+                const nameParts = verse.name.split(' ');
+                if (nameParts.length >= 2) {
+                    const refPart = nameParts[nameParts.length - 1];
+                    bookName = nameParts.slice(0, -1).join(' ');
+                }
+            } else if (verse.book) {
+                verseReference = `${verse.book} ${chapterNum}:${verseNum}`;
+                bookName = verse.book;
+            } else {
+                verseReference = `${bookName} ${chapterNum}:${verseNum}`;
+            }
+            
+            // Update the next verse preview display
+            document.getElementById('nextVerseReference').textContent = verseReference;
+            document.getElementById('nextVerseText').textContent = verse.text;
+            document.getElementById('nextVersePreview').style.display = 'block';
+            
+            console.log('Next verse preview updated:', {
+                reference: verseReference,
+                text: verse.text.substring(0, 50) + '...'
+            });
+        }
+
+        function hideNextVersePreview() {
+            document.getElementById('nextVersePreview').style.display = 'none';
         }
 
         function searchBible() {
@@ -811,12 +1200,10 @@
         // Chapter select handler
         document.getElementById('chapterSelect').addEventListener('change', function() {
             selectedChapter = parseInt(this.value);
+            currentChapter = selectedChapter;
             selectedVerse = 0; // Reset verse selection
+            currentVerse = 0;
             if (selectedChapter && selectedBook) {
-                // Ensure currentBookData is set
-                if (!currentBookData) {
-                    currentBookData = books.find(b => b.abbrev === selectedBook || b.name === selectedBook);
-                }
                 requestVerses(selectedBook, selectedChapter);
             } else {
                 document.getElementById('verseSelect').disabled = true;
@@ -829,11 +1216,8 @@
         // Verse select handler  
         document.getElementById('verseSelect').addEventListener('change', function() {
             selectedVerse = parseInt(this.value);
+            currentVerse = selectedVerse;
             if (selectedVerse && selectedBook && selectedChapter) {
-                // Ensure currentBookData is set
-                if (!currentBookData) {
-                    currentBookData = books.find(b => b.abbrev === selectedBook || b.name === selectedBook);
-                }
                 // Request the actual verse text for preview
                 requestVersePreview(selectedBook, selectedChapter, selectedVerse);
                 updateNavigationButtons();

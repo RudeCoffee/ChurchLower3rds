@@ -31,7 +31,7 @@ type BibleData struct {
 }
 
 type BibleBook struct {
-	Name     string        `json:"name"`
+	Name     string         `json:"name"`
 	Chapters []BibleChapter `json:"chapters"`
 }
 
@@ -79,6 +79,35 @@ type VersesResponse struct {
 var obsClient *websocket.Conn
 var controlClients []*websocket.Conn
 var bibleData BibleData
+var speakers []string
+
+func loadSpeakers() {
+	data, err := ioutil.ReadFile("speakers.txt")
+	if err != nil {
+		log.Printf("Warning: Could not load speakers.txt: %v", err)
+		log.Println("Speaker autocomplete will not be available")
+		// Add some default speakers
+		speakers = []string{
+			"Pastor",
+			"Rev.",
+			"Dr.",
+			"Elder",
+		}
+		return
+	}
+
+	// Split the file content by lines and trim whitespace
+	lines := strings.Split(string(data), "\n")
+	speakers = []string{}
+	for _, line := range lines {
+		line = strings.TrimSpace(line)
+		if line != "" {
+			speakers = append(speakers, line)
+		}
+	}
+
+	log.Printf("Loaded %d speakers", len(speakers))
+}
 
 func loadBibleData() {
 	data, err := ioutil.ReadFile("kjv.json")
@@ -177,10 +206,12 @@ func getBookNames(filter string) []string {
 	filter = strings.ToLower(filter)
 
 	for _, book := range bibleData.Books {
-		if filter == "" || strings.Contains(strings.ToLower(book.Name), filter) {
-			books = append(books, book.Name)
+		bookName := book.Name // Make sure we're using the correct field name
+		if filter == "" || strings.Contains(strings.ToLower(bookName), filter) {
+			books = append(books, bookName)
 		}
 	}
+
 	return books
 }
 
@@ -217,6 +248,19 @@ func getVerseNumbers(bookName string, chapterNum int) []int {
 	return verses
 }
 
+func getSpeakers(filter string) []string {
+	var filteredSpeakers []string
+	filter = strings.ToLower(filter)
+
+	for _, speaker := range speakers {
+		if filter == "" || strings.Contains(strings.ToLower(speaker), filter) {
+			filteredSpeakers = append(filteredSpeakers, speaker)
+		}
+	}
+
+	return filteredSpeakers
+}
+
 func getVerse(bookName string, chapterNum int, verseNum int) *BibleVerse {
 	for _, book := range bibleData.Books {
 		if strings.EqualFold(book.Name, bookName) {
@@ -224,18 +268,51 @@ func getVerse(bookName string, chapterNum int, verseNum int) *BibleVerse {
 				if chapter.Chapter == chapterNum {
 					for _, verse := range chapter.Verses {
 						if verse.Verse == verseNum {
+							// Return the verse with the original name from the JSON
 							return &BibleVerse{
 								Chapter: verse.Chapter,
-								Verse:   verse.Verse,
 								Text:    verse.Text,
-								Name:    verse.Name,
+								Verse:   verse.Verse,
+								Name:    verse.Name, // Use the actual verse name from JSON
+							}
+						}
+					}
+				}
+			}
+		}
+	}
+	return nil
+}
+
+func getNextVerse(bookName string, chapterNum int, verseNum int) *BibleVerse {
+	for _, book := range bibleData.Books {
+		if strings.EqualFold(book.Name, bookName) {
+			// First try to get the next verse in the same chapter
+			nextVerse := getVerse(bookName, chapterNum, verseNum+1)
+			if nextVerse != nil {
+				return nextVerse
+			}
+
+			// If no next verse in current chapter, try first verse of next chapter
+			for i, chapter := range book.Chapters {
+				if chapter.Chapter == chapterNum {
+					// Found current chapter, try to get next chapter
+					if i+1 < len(book.Chapters) {
+						nextChapter := book.Chapters[i+1]
+						if len(nextChapter.Verses) > 0 {
+							// Return first verse of next chapter
+							firstVerse := nextChapter.Verses[0]
+							return &BibleVerse{
+								Chapter: firstVerse.Chapter,
+								Text:    firstVerse.Text,
+								Verse:   firstVerse.Verse,
+								Name:    firstVerse.Name,
 							}
 						}
 					}
 					break
 				}
 			}
-			break
 		}
 	}
 	return nil
@@ -322,6 +399,23 @@ func handleControlWebSocket(w http.ResponseWriter, r *http.Request) {
 				conn.WriteJSON(response)
 			}
 
+		case "get_speakers":
+			var req struct {
+				Type   string `json:"type"`
+				Filter string `json:"filter,omitempty"`
+			}
+			if err := json.Unmarshal(rawMsg, &req); err == nil {
+				filteredSpeakers := getSpeakers(req.Filter)
+				response := struct {
+					Type     string   `json:"type"`
+					Speakers []string `json:"speakers"`
+				}{
+					Type:     "speakers_response",
+					Speakers: filteredSpeakers,
+				}
+				conn.WriteJSON(response)
+			}
+
 		case "get_chapters":
 			var req struct {
 				Type string `json:"type"`
@@ -377,6 +471,49 @@ func handleControlWebSocket(w http.ResponseWriter, r *http.Request) {
 				}
 			}
 
+		case "get_next_verse":
+			var req struct {
+				Type    string `json:"type"`
+				Book    string `json:"book"`
+				Chapter int    `json:"chapter"`
+				Verse   int    `json:"verse"`
+			}
+			if err := json.Unmarshal(rawMsg, &req); err == nil {
+				nextVerse := getNextVerse(req.Book, req.Chapter, req.Verse)
+				if nextVerse != nil {
+					// Send verse to OBS for display
+					obsMsg := Message{
+						Type:  "bible",
+						Book:  nextVerse.Name,
+						Verse: nextVerse.Text,
+						Show:  true,
+					}
+					if obsClient != nil {
+						obsClient.WriteJSON(obsMsg)
+					}
+
+					// Send response back to control client with new verse info
+					response := struct {
+						Type  string     `json:"type"`
+						Verse BibleVerse `json:"verse"`
+					}{
+						Type:  "next_verse_response",
+						Verse: *nextVerse,
+					}
+					conn.WriteJSON(response)
+				} else {
+					// No next verse available
+					response := struct {
+						Type  string      `json:"type"`
+						Verse *BibleVerse `json:"verse"`
+					}{
+						Type:  "next_verse_response",
+						Verse: nil,
+					}
+					conn.WriteJSON(response)
+				}
+			}
+
 		case "preview_verse":
 			var req struct {
 				Type    string `json:"type"`
@@ -394,6 +531,39 @@ func handleControlWebSocket(w http.ResponseWriter, r *http.Request) {
 					}{
 						Type:  "verse_preview",
 						Verse: *verse,
+					}
+					conn.WriteJSON(response)
+				}
+			}
+
+		case "preview_next_verse":
+			var req struct {
+				Type    string `json:"type"`
+				Book    string `json:"book"`
+				Chapter int    `json:"chapter"`
+				Verse   int    `json:"verse"`
+			}
+			if err := json.Unmarshal(rawMsg, &req); err == nil {
+				// Get the next verse (handles chapter boundaries)
+				nextVerse := getNextVerse(req.Book, req.Chapter, req.Verse)
+				if nextVerse != nil {
+					// Send next verse data back to client for preview
+					response := struct {
+						Type  string     `json:"type"`
+						Verse BibleVerse `json:"verse"`
+					}{
+						Type:  "next_verse_preview",
+						Verse: *nextVerse,
+					}
+					conn.WriteJSON(response)
+				} else {
+					// If next verse doesn't exist, send empty response
+					response := struct {
+						Type  string      `json:"type"`
+						Verse *BibleVerse `json:"verse"`
+					}{
+						Type:  "next_verse_preview",
+						Verse: nil,
 					}
 					conn.WriteJSON(response)
 				}
@@ -418,6 +588,9 @@ func handleControlWebSocket(w http.ResponseWriter, r *http.Request) {
 func main() {
 	// Load Bible data
 	loadBibleData()
+
+	// Load speakers
+	loadSpeakers()
 
 	// Serve static files
 	http.Handle("/", http.FileServer(http.Dir("./")))

@@ -16,23 +16,29 @@
             opacity: 0;
         }
         #bibleBook {
-            top: 20px;
+            bottom: 80px;
             left: 20px;
-            font-size: 36px;
+            font-size: 45px;
             font-weight: bold;
+            max-width: calc(100% - 40px);
+            z-index: 1;
         }
         #bibleVerse {
-            top: 60px;
+            bottom: 25px;
             left: 20px;
-            font-size: 24px;
+            font-size: 40px;
+            max-width: calc(100% - 40px);
+            line-height: 1.4;
+            z-index: 1;
         }
         #bibleBackground {
-            top: 10px;
+            bottom: 10px;
             left: 10px;
             width: calc(100% - 20px);
-            height: 80px;
-            background-color: rgba(0, 0, 0, 0.5);
+            height: 150px;
+            background-color: rgba(0, 0, 0, 0.6);
             z-index: -1;
+            border-radius: 8px;
         }
         .speaker {
             position: absolute;
@@ -43,18 +49,22 @@
             opacity: 0;
         }
         #speakerText {
-            bottom: 20px;
-            left: 20px;
-            font-size: 30px;
+            bottom: 25px;
+            left: 10px;
+            font-size: 70px;
             font-weight: bold;
+            width: calc(100% - 20px);
+            text-align: center;
+            z-index: 1;
         }
         #speakerBackground {
             bottom: 10px;
             left: 10px;
             width: calc(100% - 20px);
-            height: 60px;
-            background-color: rgba(0, 0, 0, 0.5);
+            height: 120px;
+            background-color: rgba(0, 0, 0, 0.6);
             z-index: -1;
+            border-radius: 8px;
         }
         .visible {
             opacity: 1 !important;
@@ -74,27 +84,97 @@
     <script>
         const ws = new WebSocket('ws://localhost:8080/ws/obs');
         
+        function adjustBibleLayout() {
+            const bibleVerse = document.getElementById('bibleVerse');
+            const bibleBook = document.getElementById('bibleBook');
+            const bibleBackground = document.getElementById('bibleBackground');
+            
+            // Force a reflow to get accurate measurements
+            bibleVerse.style.height = 'auto';
+            
+            // Measure the actual height of the verse text
+            const verseHeight = bibleVerse.scrollHeight;
+            const bookHeight = bibleBook.scrollHeight;
+            
+            // Calculate total height needed
+            // Base padding (25px bottom + spacing + book height + top padding)
+            const basePadding = 25 + 15; // bottom padding + spacing between book and verse
+            const topPadding = 15;
+            const totalHeight = basePadding + verseHeight + bookHeight + topPadding;
+            
+            // Set minimum height of 150px, but expand if needed
+            const finalHeight = Math.max(150, totalHeight);
+            
+            // Adjust background height
+            bibleBackground.style.height = finalHeight + 'px';
+            
+            // Adjust book position based on verse height
+            const bookBottom = 25 + verseHeight + 15; // verse bottom + verse height + spacing
+            bibleBook.style.bottom = bookBottom + 'px';
+        }
+        
         ws.onmessage = function(event) {
             const data = JSON.parse(event.data);
             
             if (data.type === 'bible') {
-                document.getElementById('bibleBook').textContent = data.book || '';
-                document.getElementById('bibleVerse').textContent = data.verse || '';
-                
                 const bibleElements = document.querySelectorAll('.bible');
+                const speakerElements = document.querySelectorAll('.speaker');
+                
                 if (data.show) {
-                    bibleElements.forEach(el => el.classList.add('visible'));
+                    // Hide speaker first if it's visible
+                    if (document.querySelector('.speaker.visible')) {
+                        speakerElements.forEach(el => el.classList.remove('visible'));
+                        setTimeout(() => {
+                            document.getElementById('speakerText').textContent = '';
+                        }, 1000);
+                    }
+                    
+                    // Set text content first
+                    document.getElementById('bibleBook').textContent = data.book || '';
+                    document.getElementById('bibleVerse').textContent = data.verse || '';
+                    
+                    // Adjust layout based on content size
+                    setTimeout(() => {
+                        adjustBibleLayout();
+                        // Show bible verse after layout adjustment
+                        bibleElements.forEach(el => el.classList.add('visible'));
+                    }, 10);
                 } else {
+                    // Start fade out first
                     bibleElements.forEach(el => el.classList.remove('visible'));
+                    // Clear text after fade animation completes (1 second)
+                    setTimeout(() => {
+                        document.getElementById('bibleBook').textContent = '';
+                        document.getElementById('bibleVerse').textContent = '';
+                        // Reset to default layout
+                        document.getElementById('bibleBackground').style.height = '150px';
+                        document.getElementById('bibleBook').style.bottom = '80px';
+                    }, 1000);
                 }
             } else if (data.type === 'speaker') {
-                document.getElementById('speakerText').textContent = data.speaker || '';
-                
                 const speakerElements = document.querySelectorAll('.speaker');
+                const bibleElements = document.querySelectorAll('.bible');
+                
                 if (data.show) {
+                    // Hide bible verse first if it's visible
+                    if (document.querySelector('.bible.visible')) {
+                        bibleElements.forEach(el => el.classList.remove('visible'));
+                        setTimeout(() => {
+                            document.getElementById('bibleBook').textContent = '';
+                            document.getElementById('bibleVerse').textContent = '';
+                        }, 1000);
+                    }
+                    
+                    // Set text content first, then show speaker
+                    document.getElementById('speakerText').textContent = data.speaker || '';
                     speakerElements.forEach(el => el.classList.add('visible'));
                 } else {
+                    // Start fade out first
                     speakerElements.forEach(el => el.classList.remove('visible'));
+                    // Clear text after fade animation completes (1 second)
+                    setTimeout(() => {
+                        document.getElementById('speakerText').textContent = '';
+                    }, 1000);
                 }
             }
         };
