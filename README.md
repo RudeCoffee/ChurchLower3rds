@@ -6,6 +6,10 @@ A real-time Bible verse and speaker name display system for OBS (Open Broadcaste
 ![Go Version](https://img.shields.io/badge/go-1.21+-blue.svg)
 ![Platform](https://img.shields.io/badge/platform-Windows%20%7C%20macOS%20%7C%20Linux-lightgrey.svg)
 
+
+<img width="1986" height="1288" alt="image" src="https://github.com/user-attachments/assets/e8ce40da-fd31-430f-9324-0c65e2b1f6d6" />
+
+
 ## Features
 
 ### 📖 Bible Verse Display
