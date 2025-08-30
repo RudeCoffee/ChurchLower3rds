@@ -2,22 +2,57 @@
 <head>
     <title>Church Lower 3rds Control</title>
     <style>
+        :root {
+            --bg-color: #2b2b2b;
+            --container-bg: #3c3c3c;
+            --text-color: #e0e0e0;
+            --border-color: #555;
+            --input-bg: #4a4a4a;
+            --button-bg: #007cba;
+            --button-hover: #005a87;
+            --danger-bg: #dc3545;
+            --danger-hover: #c82333;
+            --success-bg: #28a745;
+            --success-border: #1e7e34;
+            --preview-bg: #454545;
+            --dropdown-bg: #3c3c3c;
+        }
+
+        .light-mode {
+            --bg-color: #f5f5f5;
+            --container-bg: white;
+            --text-color: #333;
+            --border-color: #ddd;
+            --input-bg: white;
+            --button-bg: #007cba;
+            --button-hover: #005a87;
+            --danger-bg: #dc3545;
+            --danger-hover: #c82333;
+            --success-bg: #d4edda;
+            --success-border: #c3e6cb;
+            --preview-bg: #f8f9fa;
+            --dropdown-bg: white;
+        }
+
         body {
             font-family: Arial, sans-serif;
             max-width: 800px;
             margin: 0 auto;
             padding: 20px;
-            background-color: #f5f5f5;
+            background-color: var(--bg-color);
+            color: var(--text-color);
+            transition: background-color 0.3s, color 0.3s;
         }
         .container {
-            background: white;
+            background: var(--container-bg);
             padding: 20px;
             border-radius: 8px;
-            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            box-shadow: 0 2px 4px rgba(0,0,0,0.3);
             margin-bottom: 20px;
+            transition: background-color 0.3s;
         }
         h1, h2 {
-            color: #333;
+            color: var(--text-color);
             margin-top: 0;
         }
         .form-group {
@@ -27,20 +62,67 @@
             display: block;
             margin-bottom: 5px;
             font-weight: bold;
+            color: var(--text-color);
         }
         input, textarea, select {
             width: 100%;
             padding: 8px;
-            border: 1px solid #ddd;
+            border: 1px solid var(--border-color);
             border-radius: 4px;
             font-size: 14px;
             box-sizing: border-box;
+            background-color: var(--input-bg);
+            color: var(--text-color);
+            transition: background-color 0.3s, color 0.3s, border-color 0.3s;
         }
         .verse-selector {
             display: grid;
             grid-template-columns: 2fr 1fr 1fr;
             gap: 10px;
             margin-bottom: 15px;
+        }
+        .verse-navigation {
+            display: grid;
+            grid-template-columns: 1fr auto auto auto 1fr;
+            gap: 10px;
+            margin-bottom: 15px;
+            align-items: center;
+        }
+        .nav-button {
+            background-color: var(--button-bg);
+            color: white;
+            border: none;
+            padding: 8px 12px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 14px;
+            min-width: 80px;
+        }
+        .nav-button:hover {
+            background-color: var(--button-hover);
+        }
+        .nav-button:disabled {
+            background-color: #6c757d;
+            cursor: not-allowed;
+        }
+        .theme-toggle {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            background-color: var(--button-bg);
+            color: white;
+            border: none;
+            padding: 10px;
+            border-radius: 50%;
+            cursor: pointer;
+            font-size: 16px;
+            width: 50px;
+            height: 50px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.3);
+            transition: background-color 0.3s;
+        }
+        .theme-toggle:hover {
+            background-color: var(--button-hover);
         }
         .autocomplete-container {
             position: relative;
@@ -50,28 +132,30 @@
             top: 100%;
             left: 0;
             right: 0;
-            background: white;
-            border: 1px solid #ddd;
+            background: var(--dropdown-bg);
+            border: 1px solid var(--border-color);
             border-top: none;
             max-height: 200px;
             overflow-y: auto;
             z-index: 1000;
             display: none;
+            transition: background-color 0.3s;
         }
         .autocomplete-item {
             padding: 8px;
             cursor: pointer;
-            border-bottom: 1px solid #eee;
+            border-bottom: 1px solid var(--border-color);
+            color: var(--text-color);
         }
         .autocomplete-item:hover {
-            background-color: #f8f9fa;
+            background-color: var(--preview-bg);
         }
         .autocomplete-item.selected {
-            background-color: #007cba;
+            background-color: var(--button-bg);
             color: white;
         }
         button {
-            background-color: #007cba;
+            background-color: var(--button-bg);
             color: white;
             border: none;
             padding: 10px 20px;
@@ -79,54 +163,85 @@
             cursor: pointer;
             font-size: 14px;
             margin-right: 10px;
+            transition: background-color 0.3s;
         }
         button:hover {
-            background-color: #005a87;
+            background-color: var(--button-hover);
         }
         button:disabled {
             background-color: #6c757d;
             cursor: not-allowed;
         }
         button.hide {
-            background-color: #dc3545;
+            background-color: var(--danger-bg);
         }
         button.hide:hover {
-            background-color: #c82333;
+            background-color: var(--danger-hover);
         }
         .status {
             padding: 10px;
             border-radius: 4px;
             margin-bottom: 20px;
+            transition: background-color 0.3s, color 0.3s;
         }
         .status.connected {
-            background-color: #d4edda;
-            color: #155724;
-            border: 1px solid #c3e6cb;
+            background-color: var(--success-bg);
+            color: var(--text-color);
+            border: 1px solid var(--success-border);
         }
         .status.disconnected {
-            background-color: #f8d7da;
-            color: #721c24;
-            border: 1px solid #f5c6cb;
+            background-color: var(--danger-bg);
+            color: white;
+            border: 1px solid var(--danger-hover);
         }
         .verse-preview {
-            background-color: #f8f9fa;
-            border: 1px solid #ddd;
+            background-color: var(--preview-bg);
+            border: 1px solid var(--border-color);
             border-radius: 4px;
             padding: 15px;
             margin-top: 15px;
             display: none;
+            transition: background-color 0.3s, border-color 0.3s;
         }
         .verse-preview h3 {
             margin-top: 0;
-            color: #007cba;
+            color: var(--button-bg);
         }
         .verse-text {
             font-style: italic;
             line-height: 1.5;
+            color: var(--text-color);
+        }
+        .search-results {
+            max-height: 300px;
+            overflow-y: auto;
+            border: 1px solid var(--border-color);
+            border-radius: 4px;
+            margin-top: 10px;
+            background-color: var(--container-bg);
+            transition: background-color 0.3s, border-color 0.3s;
+        }
+        .search-result {
+            padding: 10px;
+            border-bottom: 1px solid var(--border-color);
+            cursor: pointer;
+            color: var(--text-color);
+        }
+        .search-result:hover {
+            background-color: var(--preview-bg);
+        }
+        .search-result:last-child {
+            border-bottom: none;
+        }
+        .verse-reference {
+            font-weight: bold;
+            color: var(--button-bg);
         }
     </style>
 </head>
-<body>
+<body class="light-mode">
+    <button class="theme-toggle" onclick="toggleTheme()" title="Toggle Dark Mode">🌙</button>
+    
     <div class="status" id="status">Connecting...</div>
     
     <div class="container">
@@ -153,6 +268,14 @@
                     <option value="">Select verse</option>
                 </select>
             </div>
+        </div>
+        
+        <div class="verse-navigation">
+            <div></div>
+            <button class="nav-button" onclick="previousVerse()" id="prevBtn" disabled>← Previous</button>
+            <span id="currentVerseRef" style="text-align: center; font-weight: bold;">Select a verse</span>
+            <button class="nav-button" onclick="nextVerse()" id="nextBtn" disabled>Next →</button>
+            <div></div>
         </div>
         
         <div class="verse-preview" id="versePreview">
@@ -190,6 +313,172 @@
         let selectedVerse = 0;
         let currentAutocompleteIndex = -1;
         let books = [];
+        let currentBookData = null;
+        let currentVerseData = null;
+
+        // Theme toggle function
+        function toggleTheme() {
+            const body = document.body;
+            const themeToggle = document.querySelector('.theme-toggle');
+            
+            if (body.classList.contains('light-mode')) {
+                body.classList.remove('light-mode');
+                themeToggle.textContent = '☀️';
+                themeToggle.title = 'Toggle Light Mode';
+                localStorage.setItem('theme', 'dark');
+            } else {
+                body.classList.add('light-mode');
+                themeToggle.textContent = '🌙';
+                themeToggle.title = 'Toggle Dark Mode';
+                localStorage.setItem('theme', 'light');
+            }
+        }
+
+        // Load saved theme on page load
+        window.addEventListener('DOMContentLoaded', function() {
+            const savedTheme = localStorage.getItem('theme') || 'light';
+            const body = document.body;
+            const themeToggle = document.querySelector('.theme-toggle');
+            
+            if (savedTheme === 'dark') {
+                body.classList.remove('light-mode');
+                themeToggle.textContent = '☀️';
+                themeToggle.title = 'Toggle Light Mode';
+            } else {
+                body.classList.add('light-mode');
+                themeToggle.textContent = '🌙';
+                themeToggle.title = 'Toggle Dark Mode';
+            }
+        });
+
+        // Navigation functions
+        function previousVerse() {
+            if (!currentBookData || !selectedBook || selectedChapter === 0 || selectedVerse === 0) return;
+            
+            if (selectedVerse > 1) {
+                // Previous verse in same chapter
+                selectVerse(selectedBook, selectedChapter, selectedVerse - 1);
+            } else if (selectedChapter > 1) {
+                // Last verse of previous chapter
+                const prevChapter = selectedChapter - 1;
+                const prevChapterVerses = currentBookData.chapters[prevChapter - 1].length;
+                selectVerse(selectedBook, prevChapter, prevChapterVerses);
+            } else {
+                // Last verse of last chapter of previous book
+                const currentBookIndex = books.findIndex(book => book.abbrev === selectedBook || book.name === selectedBook);
+                if (currentBookIndex > 0) {
+                    const prevBook = books[currentBookIndex - 1];
+                    const lastChapter = prevBook.chapters.length;
+                    const lastVerse = prevBook.chapters[lastChapter - 1].length;
+                    selectVerse(prevBook.abbrev, lastChapter, lastVerse);
+                }
+            }
+        }
+
+        function nextVerse() {
+            if (!currentBookData || !selectedBook || selectedChapter === 0 || selectedVerse === 0) return;
+            
+            const currentChapterVerses = currentBookData.chapters[selectedChapter - 1].length;
+            
+            if (selectedVerse < currentChapterVerses) {
+                // Next verse in same chapter
+                selectVerse(selectedBook, selectedChapter, selectedVerse + 1);
+            } else if (selectedChapter < currentBookData.chapters.length) {
+                // First verse of next chapter
+                selectVerse(selectedBook, selectedChapter + 1, 1);
+            } else {
+                // First verse of first chapter of next book
+                const currentBookIndex = books.findIndex(book => book.abbrev === selectedBook || book.name === selectedBook);
+                if (currentBookIndex < books.length - 1) {
+                    const nextBook = books[currentBookIndex + 1];
+                    selectVerse(nextBook.abbrev, 1, 1);
+                }
+            }
+        }
+
+        function selectVerse(book, chapter, verse) {
+            selectedBook = book;
+            selectedChapter = chapter;
+            selectedVerse = verse;
+            
+            // Update the book selector
+            const bookInput = document.getElementById('bookInput');
+            const foundBook = books.find(b => b.abbrev === book || b.name === book);
+            if (foundBook) {
+                bookInput.value = foundBook.name;
+                currentBookData = foundBook;
+                
+                // Request chapters for this book
+                requestChapters(foundBook.abbrev);
+                
+                // Update chapter selector
+                setTimeout(() => {
+                    const chapterSelect = document.getElementById('chapterSelect');
+                    chapterSelect.value = chapter;
+                    chapterSelect.disabled = false;
+                    
+                    // Request verses for this chapter
+                    requestVerses(foundBook.abbrev, chapter);
+                    
+                    // Update verse selector
+                    setTimeout(() => {
+                        const verseSelect = document.getElementById('verseSelect');
+                        verseSelect.value = verse;
+                        verseSelect.disabled = false;
+                        
+                        // Get and preview the verse
+                        requestVersePreview(foundBook.abbrev, chapter, verse);
+                        updateNavigationButtons();
+                    }, 100);
+                }, 100);
+            }
+        }
+
+        function updateNavigationButtons() {
+            const prevBtn = document.getElementById('prevBtn');
+            const nextBtn = document.getElementById('nextBtn');
+            const currentRef = document.getElementById('currentVerseRef');
+            
+            console.log('updateNavigationButtons called:', {
+                currentBookData: !!currentBookData,
+                selectedBook,
+                selectedChapter,
+                selectedVerse
+            });
+            
+            if (!currentBookData || !selectedBook || selectedChapter === 0 || selectedVerse === 0) {
+                prevBtn.disabled = true;
+                nextBtn.disabled = true;
+                currentRef.textContent = 'Select a verse';
+                console.log('Navigation buttons disabled - missing data');
+                return;
+            }
+            
+            const foundBook = books.find(b => b.abbrev === selectedBook || b.name === selectedBook);
+            if (foundBook) {
+                currentRef.textContent = `${foundBook.name} ${selectedChapter}:${selectedVerse}`;
+            }
+            
+            // Check if previous verse exists
+            const currentBookIndex = books.findIndex(book => book.abbrev === selectedBook || book.name === selectedBook);
+            const canGoPrev = !(currentBookIndex === 0 && selectedChapter === 1 && selectedVerse === 1);
+            prevBtn.disabled = !canGoPrev;
+            
+            // Check if next verse exists
+            const currentChapterVerses = currentBookData.chapters[selectedChapter - 1].length;
+            const isLastVerseOfChapter = selectedVerse === currentChapterVerses;
+            const isLastChapter = selectedChapter === currentBookData.chapters.length;
+            const isLastBook = currentBookIndex === books.length - 1;
+            const canGoNext = !(isLastVerseOfChapter && isLastChapter && isLastBook);
+            nextBtn.disabled = !canGoNext;
+            
+            console.log('Navigation buttons updated:', {
+                canGoPrev,
+                canGoNext,
+                prevDisabled: prevBtn.disabled,
+                nextDisabled: nextBtn.disabled
+            });
+        }
 
         function connect() {
             ws = new WebSocket('ws://localhost:8080/ws/control');
@@ -395,6 +684,8 @@
         function selectBook(book) {
             document.getElementById('bookInput').value = book;
             selectedBook = book;
+            selectedChapter = 0; // Reset chapter
+            selectedVerse = 0; // Reset verse
             hideBookDropdown();
             
             // Reset chapter and verse
@@ -402,6 +693,10 @@
             document.getElementById('verseSelect').innerHTML = '<option value="">Select verse</option>';
             document.getElementById('verseSelect').disabled = true;
             hideVersePreview();
+            updateNavigationButtons();
+            
+            // Store current book data
+            currentBookData = books.find(b => b.abbrev === book || b.name === book);
             
             // Request chapters for this book
             requestChapters(book);
@@ -412,6 +707,8 @@
             document.getElementById('verseText').textContent = verse.text;
             document.getElementById('versePreview').style.display = 'block';
             document.getElementById('displayBtn').disabled = false;
+            // Update navigation buttons when verse is shown
+            updateNavigationButtons();
         }
 
         function hideVersePreview() {
@@ -514,23 +811,35 @@
         // Chapter select handler
         document.getElementById('chapterSelect').addEventListener('change', function() {
             selectedChapter = parseInt(this.value);
+            selectedVerse = 0; // Reset verse selection
             if (selectedChapter && selectedBook) {
+                // Ensure currentBookData is set
+                if (!currentBookData) {
+                    currentBookData = books.find(b => b.abbrev === selectedBook || b.name === selectedBook);
+                }
                 requestVerses(selectedBook, selectedChapter);
             } else {
                 document.getElementById('verseSelect').disabled = true;
                 document.getElementById('verseSelect').innerHTML = '<option value="">Select verse</option>';
                 hideVersePreview();
             }
+            updateNavigationButtons();
         });
 
         // Verse select handler  
         document.getElementById('verseSelect').addEventListener('change', function() {
             selectedVerse = parseInt(this.value);
             if (selectedVerse && selectedBook && selectedChapter) {
+                // Ensure currentBookData is set
+                if (!currentBookData) {
+                    currentBookData = books.find(b => b.abbrev === selectedBook || b.name === selectedBook);
+                }
                 // Request the actual verse text for preview
                 requestVersePreview(selectedBook, selectedChapter, selectedVerse);
+                updateNavigationButtons();
             } else {
                 hideVersePreview();
+                updateNavigationButtons();
             }
         });
 

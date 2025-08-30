@@ -26,17 +26,26 @@ type Message struct {
 	Show    bool   `json:"show,omitempty"`
 }
 
-type BibleVerse struct {
-	Book    string `json:"book"`
-	Chapter int    `json:"chapter"`
-	Verse   int    `json:"verse"`
-	Text    string `json:"text"`
+type BibleData struct {
+	Books []BibleBook `json:"books"`
 }
 
 type BibleBook struct {
-	Abbrev   string     `json:"abbrev"`
-	Name     string     `json:"name"`
-	Chapters [][]string `json:"chapters"`
+	Name     string        `json:"name"`
+	Chapters []BibleChapter `json:"chapters"`
+}
+
+type BibleChapter struct {
+	Chapter int          `json:"chapter"`
+	Verses  []BibleVerse `json:"verses"`
+	Name    string       `json:"name"`
+}
+
+type BibleVerse struct {
+	Chapter int    `json:"chapter"`
+	Text    string `json:"text"`
+	Verse   int    `json:"verse"`
+	Name    string `json:"name"`
 }
 
 type SearchRequest struct {
@@ -69,7 +78,7 @@ type VersesResponse struct {
 
 var obsClient *websocket.Conn
 var controlClients []*websocket.Conn
-var bibleBooks []BibleBook
+var bibleData BibleData
 
 func loadBibleData() {
 	data, err := ioutil.ReadFile("kjv.json")
@@ -79,13 +88,13 @@ func loadBibleData() {
 		return
 	}
 
-	err = json.Unmarshal(data, &bibleBooks)
+	err = json.Unmarshal(data, &bibleData)
 	if err != nil {
 		log.Printf("Error parsing Bible data: %v", err)
 		return
 	}
 
-	log.Printf("Loaded %d Bible books", len(bibleBooks))
+	log.Printf("Loaded %d Bible books", len(bibleData.Books))
 }
 
 func searchBible(query string) []BibleVerse {
@@ -107,17 +116,22 @@ func searchBible(query string) []BibleVerse {
 
 				if err1 == nil && err2 == nil {
 					// Find matching book and verse
-					for _, book := range bibleBooks {
+					for _, book := range bibleData.Books {
 						if strings.Contains(strings.ToLower(book.Name), bookName) {
-							if chapter > 0 && chapter <= len(book.Chapters) {
-								chapterVerses := book.Chapters[chapter-1]
-								if verse > 0 && verse <= len(chapterVerses) {
-									results = append(results, BibleVerse{
-										Book:    book.Name,
-										Chapter: chapter,
-										Verse:   verse,
-										Text:    chapterVerses[verse-1],
-									})
+							// Find the specific chapter
+							for _, chapterData := range book.Chapters {
+								if chapterData.Chapter == chapter {
+									// Find the specific verse
+									for _, verseData := range chapterData.Verses {
+										if verseData.Verse == verse {
+											results = append(results, BibleVerse{
+												Chapter: verseData.Chapter,
+												Verse:   verseData.Verse,
+												Text:    verseData.Text,
+												Name:    verseData.Name,
+											})
+										}
+									}
 								}
 							}
 						}
@@ -129,16 +143,16 @@ func searchBible(query string) []BibleVerse {
 
 	// If no specific reference found, search text content
 	if len(results) == 0 {
-		for _, book := range bibleBooks {
-			for chapterNum, chapter := range book.Chapters {
-				for verseNum, verseText := range chapter {
-					if strings.Contains(strings.ToLower(verseText), query) ||
+		for _, book := range bibleData.Books {
+			for _, chapter := range book.Chapters {
+				for _, verse := range chapter.Verses {
+					if strings.Contains(strings.ToLower(verse.Text), query) ||
 						strings.Contains(strings.ToLower(book.Name), query) {
 						results = append(results, BibleVerse{
-							Book:    book.Name,
-							Chapter: chapterNum + 1,
-							Verse:   verseNum + 1,
-							Text:    verseText,
+							Chapter: verse.Chapter,
+							Verse:   verse.Verse,
+							Text:    verse.Text,
+							Name:    verse.Name,
 						})
 						if len(results) >= 20 { // Limit results
 							break
@@ -162,7 +176,7 @@ func getBookNames(filter string) []string {
 	var books []string
 	filter = strings.ToLower(filter)
 
-	for _, book := range bibleBooks {
+	for _, book := range bibleData.Books {
 		if filter == "" || strings.Contains(strings.ToLower(book.Name), filter) {
 			books = append(books, book.Name)
 		}
@@ -173,10 +187,10 @@ func getBookNames(filter string) []string {
 func getChapterNumbers(bookName string) []int {
 	var chapters []int
 
-	for _, book := range bibleBooks {
+	for _, book := range bibleData.Books {
 		if strings.EqualFold(book.Name, bookName) {
-			for i := 1; i <= len(book.Chapters); i++ {
-				chapters = append(chapters, i)
+			for _, chapter := range book.Chapters {
+				chapters = append(chapters, chapter.Chapter)
 			}
 			break
 		}
@@ -187,12 +201,14 @@ func getChapterNumbers(bookName string) []int {
 func getVerseNumbers(bookName string, chapterNum int) []int {
 	var verses []int
 
-	for _, book := range bibleBooks {
+	for _, book := range bibleData.Books {
 		if strings.EqualFold(book.Name, bookName) {
-			if chapterNum > 0 && chapterNum <= len(book.Chapters) {
-				chapter := book.Chapters[chapterNum-1]
-				for i := 1; i <= len(chapter); i++ {
-					verses = append(verses, i)
+			for _, chapter := range book.Chapters {
+				if chapter.Chapter == chapterNum {
+					for _, verse := range chapter.Verses {
+						verses = append(verses, verse.Verse)
+					}
+					break
 				}
 			}
 			break
@@ -202,17 +218,21 @@ func getVerseNumbers(bookName string, chapterNum int) []int {
 }
 
 func getVerse(bookName string, chapterNum int, verseNum int) *BibleVerse {
-	for _, book := range bibleBooks {
+	for _, book := range bibleData.Books {
 		if strings.EqualFold(book.Name, bookName) {
-			if chapterNum > 0 && chapterNum <= len(book.Chapters) {
-				chapter := book.Chapters[chapterNum-1]
-				if verseNum > 0 && verseNum <= len(chapter) {
-					return &BibleVerse{
-						Book:    book.Name,
-						Chapter: chapterNum,
-						Verse:   verseNum,
-						Text:    chapter[verseNum-1],
+			for _, chapter := range book.Chapters {
+				if chapter.Chapter == chapterNum {
+					for _, verse := range chapter.Verses {
+						if verse.Verse == verseNum {
+							return &BibleVerse{
+								Chapter: verse.Chapter,
+								Verse:   verse.Verse,
+								Text:    verse.Text,
+								Name:    verse.Name,
+							}
+						}
 					}
+					break
 				}
 			}
 			break
@@ -347,7 +367,7 @@ func handleControlWebSocket(w http.ResponseWriter, r *http.Request) {
 					// Send verse to OBS
 					obsMsg := Message{
 						Type:  "bible",
-						Book:  fmt.Sprintf("%s %d:%d", verse.Book, verse.Chapter, verse.Verse),
+						Book:  verse.Name, // Use the verse name which includes book reference
 						Verse: verse.Text,
 						Show:  true,
 					}
