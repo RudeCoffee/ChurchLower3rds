@@ -146,12 +146,6 @@ Guest Speaker Mike Wilson
 Worship Leader Sarah Davis
 ```
 
-### Server Port
-To change the default port (8080), modify the port in `main.go`:
-```go
-log.Println("Server starting on :8080")  // Change 8080 to your preferred port
-```
-
 ### Display Styling
 Customize the appearance by editing CSS in `obs.html`:
 - Font sizes, colors, and positioning
