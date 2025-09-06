@@ -251,6 +251,72 @@
             font-weight: bold;
             color: var(--button-bg);
         }
+        
+        /* Sermon Suggestion Styles */
+        .suggestion-item {
+            background: var(--container-bg);
+            border: 1px solid var(--border-color);
+            border-radius: 4px;
+            padding: 8px 12px;
+            margin: 5px 0;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            font-size: 13px;
+            position: relative;
+        }
+        
+        .suggestion-item:hover {
+            background: var(--preview-bg);
+            border-color: var(--button-bg);
+            transform: translateX(2px);
+        }
+        
+        .suggestion-item:first-child {
+            border-left: 4px solid var(--success-bg);
+            background: linear-gradient(90deg, var(--success-bg) 20%, var(--container-bg) 20%);
+        }
+        
+        .suggestion-ref {
+            font-weight: bold;
+            color: var(--button-bg);
+            margin-bottom: 3px;
+        }
+        
+        .suggestion-text {
+            color: var(--text-color);
+            font-style: italic;
+            font-size: 12px;
+            opacity: 0.9;
+        }
+        
+        .suggestion-keywords {
+            font-size: 11px;
+            color: var(--button-bg);
+            margin-top: 3px;
+            opacity: 0.7;
+        }
+        
+        .timestamp {
+            font-weight: normal;
+            opacity: 0.8;
+            font-style: italic;
+        }
+        
+        .listening-indicator {
+            display: inline-block;
+            width: 8px;
+            height: 8px;
+            background: #28a745;
+            border-radius: 50%;
+            margin-right: 5px;
+            animation: pulse 1.5s infinite;
+        }
+        
+        @keyframes pulse {
+            0% { opacity: 1; }
+            50% { opacity: 0.5; }
+            100% { opacity: 1; }
+        }
     </style>
 </head>
 <body class="light-mode">
@@ -261,6 +327,25 @@
     <div class="container">
         <h1>Church Lower 3rds Control</h1>
         
+        <div class="container" style="background: linear-gradient(135deg, var(--container-bg) 0%, var(--preview-bg) 100%); border: 2px solid var(--button-bg);">
+            <h2>🎤 Live Sermon Scripture Suggestions</h2>
+            <div class="form-group">
+                <button id="listenBtn" onclick="toggleListening()">🎤 Start Listening</button>
+                <button id="testMicBtn" onclick="testMicrophone()" style="margin-left: 10px; background-color: #6c757d;">🔍 Test Mic</button>
+                <div id="listeningStatus" style="margin: 10px 0; font-style: italic; color: #666; min-height: 40px; font-size: 13px;">Not listening</div>
+            </div>
+            
+            <div id="transcriptionBox" style="background: var(--preview-bg); border: 1px solid var(--border-color); border-radius: 4px; padding: 10px; margin: 10px 0; min-height: 60px; font-size: 12px; color: var(--text-color); display: none;">
+                <strong>Recent Speech:</strong>
+                <div id="transcriptionText" style="margin-top: 5px; font-style: italic;"></div>
+            </div>
+            
+            <div id="suggestionsList" style="display: none;">
+                <h3 style="margin: 15px 0 10px 0; font-size: 14px; color: var(--button-bg);">Scripture Suggestions:</h3>
+                <div id="suggestions" style="max-height: 200px; overflow-y: auto;"></div>
+            </div>
+        </div>
+
         <h2>Bible Verse Display</h2>
         <div class="verse-selector">
             <div class="autocomplete-container">
@@ -1575,6 +1660,548 @@
         }
 
         let pendingQuickSelection = null;
+
+        // Sermon Suggestion Feature
+        let recognition = null;
+        let isListening = false;
+        let recentTranscription = '';
+        let suggestionKeywords = new Map();
+        let lastSuggestionUpdate = 0;
+        let suggestionHistory = []; // Track suggestions with timestamps
+        let maxSuggestionHistory = 10; // Keep last 10 suggestions
+        let timestampUpdateInterval = null; // For updating timestamps
+        
+        // Common biblical terms and their associated verses
+        const biblicalKeywords = {
+            'love': ['1 Corinthians 13:4', 'John 3:16', '1 John 4:8'],
+            'faith': ['Hebrews 11:1', 'Romans 10:17', 'Ephesians 2:8'],
+            'hope': ['Romans 15:13', 'Hebrews 6:19', '1 Peter 1:3'],
+            'peace': ['John 14:27', 'Philippians 4:7', 'Isaiah 26:3'],
+            'joy': ['Nehemiah 8:10', 'Philippians 4:4', 'Psalm 16:11'],
+            'prayer': ['1 Thessalonians 5:17', 'Matthew 6:9', 'James 5:16'],
+            'forgiveness': ['Ephesians 4:32', '1 John 1:9', 'Matthew 6:14'],
+            'salvation': ['Romans 10:9', 'Ephesians 2:8', 'Acts 4:12'],
+            'grace': ['Ephesians 2:8', '2 Corinthians 12:9', 'Romans 6:14'],
+            'wisdom': ['Proverbs 3:5', 'James 1:5', '1 Corinthians 1:30'],
+            'strength': ['Philippians 4:13', 'Isaiah 40:31', '2 Corinthians 12:9'],
+            'comfort': ['2 Corinthians 1:3', 'Psalm 23:4', 'Matthew 11:28'],
+            'healing': ['Jeremiah 17:14', '1 Peter 2:24', 'Psalm 103:3'],
+            'blessing': ['Numbers 6:24', 'Ephesians 1:3', 'Psalm 1:1'],
+            'mercy': ['Lamentations 3:22', 'Psalm 23:6', 'Ephesians 2:4'],
+            'truth': ['John 14:6', 'John 8:32', 'Psalm 119:160'],
+            'light': ['John 8:12', 'Matthew 5:14', 'Psalm 119:105'],
+            'kingdom': ['Matthew 6:33', 'Mark 1:15', 'Luke 17:21'],
+            'shepherd': ['Psalm 23:1', 'John 10:11', 'Ezekiel 34:11'],
+            'resurrection': ['1 Corinthians 15:20', 'John 11:25', 'Romans 6:5'],
+            'eternal': ['John 3:16', '1 John 5:13', 'Romans 6:23'],
+            'cross': ['1 Corinthians 1:18', 'Galatians 6:14', 'Luke 9:23'],
+            'blood': ['1 John 1:7', 'Hebrews 9:22', 'Revelation 1:5'],
+            'glory': ['Romans 3:23', '2 Corinthians 3:18', '1 Corinthians 10:31'],
+            'heaven': ['Matthew 5:3', 'Revelation 21:4', '2 Corinthians 5:1'],
+            'righteousness': ['Romans 3:22', '2 Corinthians 5:21', 'Matthew 5:6'],
+            'holy': ['1 Peter 1:16', 'Leviticus 11:44', 'Isaiah 6:3'],
+            'worship': ['John 4:24', 'Psalm 95:6', 'Romans 12:1']
+        };
+
+        function initializeSpeechRecognition() {
+            if (!('webkitSpeechRecognition' in window) && !('SpeechRecognition' in window)) {
+                console.log('Speech recognition not supported');
+                document.getElementById('listenBtn').disabled = true;
+                document.getElementById('listeningStatus').innerHTML = 'Speech recognition not supported in this browser.<br><small>Try Chrome, Edge, or Brave (with shields down)</small>';
+                return false;
+            }
+
+            // Check if this is Brave browser
+            const isBrave = navigator.userAgent.includes('Brave') || (navigator.brave && navigator.brave.isBrave);
+            if (isBrave) {
+                document.getElementById('listeningStatus').innerHTML = 'Brave browser detected. You may need to:<br><small>1. Allow microphone access<br>2. Disable Brave shields for this site</small>';
+            }
+
+            const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+            recognition = new SpeechRecognition();
+            
+            recognition.continuous = true;
+            recognition.interimResults = true;
+            recognition.lang = 'en-US';
+            recognition.maxAlternatives = 1;
+
+            recognition.onstart = function() {
+                console.log('Speech recognition started');
+                document.getElementById('listeningStatus').innerHTML = '<span class="listening-indicator"></span>Listening to sermon...';
+                document.getElementById('transcriptionBox').style.display = 'block';
+            };
+
+            recognition.onresult = function(event) {
+                let interimTranscript = '';
+                let finalTranscript = '';
+
+                for (let i = event.resultIndex; i < event.results.length; i++) {
+                    const transcript = event.results[i][0].transcript;
+                    if (event.results[i].isFinal) {
+                        finalTranscript += transcript;
+                    } else {
+                        interimTranscript += transcript;
+                    }
+                }
+
+                const currentTranscript = finalTranscript + interimTranscript;
+                document.getElementById('transcriptionText').textContent = currentTranscript;
+                
+                if (finalTranscript) {
+                    recentTranscription += finalTranscript + ' ';
+                    // Keep only last 200 words to prevent memory issues
+                    const words = recentTranscription.split(' ');
+                    if (words.length > 200) {
+                        recentTranscription = words.slice(-200).join(' ');
+                    }
+                    
+                    // Throttle suggestions to once every 2 seconds
+                    const now = Date.now();
+                    if (now - lastSuggestionUpdate > 2000) {
+                        updateSuggestions();
+                        lastSuggestionUpdate = now;
+                    }
+                }
+            };
+
+            recognition.onerror = function(event) {
+                console.error('Speech recognition error:', event.error);
+                if (event.error === 'not-allowed') {
+                    document.getElementById('listeningStatus').innerHTML = 'Microphone access denied.<br><small>Please allow microphone access and try again.</small>';
+                } else if (event.error === 'no-speech') {
+                    document.getElementById('listeningStatus').innerHTML = 'No speech detected.<br><small>Make sure your microphone is working and try again.</small>';
+                } else {
+                    document.getElementById('listeningStatus').innerHTML = `Error: ${event.error}<br><small>Check microphone permissions and browser settings.</small>`;
+                }
+            };
+
+            recognition.onend = function() {
+                if (isListening) {
+                    // Restart recognition if it stops unexpectedly
+                    setTimeout(() => {
+                        if (isListening) {
+                            recognition.start();
+                        }
+                    }, 1000);
+                }
+            };
+
+            return true;
+        }
+
+        function toggleListening() {
+            if (!recognition && !initializeSpeechRecognition()) {
+                return;
+            }
+
+            const btn = document.getElementById('listenBtn');
+            const status = document.getElementById('listeningStatus');
+
+            if (isListening) {
+                // Stop listening
+                isListening = false;
+                recognition.stop();
+                btn.textContent = '🎤 Start Listening';
+                status.textContent = 'Stopped listening';
+                document.getElementById('transcriptionBox').style.display = 'none';
+                document.getElementById('suggestionsList').style.display = 'none';
+                stopTimestampUpdates();
+            } else {
+                // Start listening
+                isListening = true;
+                recentTranscription = '';
+                suggestionKeywords.clear();
+                suggestionHistory = []; // Clear suggestion history
+                
+                try {
+                    recognition.start();
+                    btn.textContent = '⏹️ Stop Listening';
+                } catch (error) {
+                    console.error('Error starting recognition:', error);
+                    isListening = false;
+                    btn.textContent = '🎤 Start Listening';
+                    status.textContent = 'Error starting speech recognition';
+                }
+            }
+        }
+
+        function testMicrophone() {
+            if (!recognition && !initializeSpeechRecognition()) {
+                return;
+            }
+
+            const testBtn = document.getElementById('testMicBtn');
+            const status = document.getElementById('listeningStatus');
+            
+            if (isListening) {
+                status.innerHTML = 'Please stop listening first before testing microphone.';
+                return;
+            }
+
+            testBtn.textContent = '🔄 Testing...';
+            testBtn.disabled = true;
+            status.innerHTML = 'Testing microphone... Say something!';
+
+            const testRecognition = new (window.SpeechRecognition || window.webkitSpeechRecognition)();
+            testRecognition.continuous = false;
+            testRecognition.interimResults = false;
+            testRecognition.lang = 'en-US';
+
+            let testTimeout = setTimeout(() => {
+                testRecognition.stop();
+                testBtn.textContent = '🔍 Test Mic';
+                testBtn.disabled = false;
+                status.innerHTML = 'Test timeout - no speech detected.<br><small>Check microphone permissions and volume.</small>';
+            }, 5000);
+
+            testRecognition.onresult = function(event) {
+                clearTimeout(testTimeout);
+                const transcript = event.results[0][0].transcript;
+                testBtn.textContent = '🔍 Test Mic';
+                testBtn.disabled = false;
+                status.innerHTML = `✅ Microphone working! Heard: "${transcript}"<br><small>You can now start listening to the sermon.</small>`;
+            };
+
+            testRecognition.onerror = function(event) {
+                clearTimeout(testTimeout);
+                testBtn.textContent = '🔍 Test Mic';
+                testBtn.disabled = false;
+                status.innerHTML = `❌ Test failed: ${event.error}<br><small>Check microphone permissions.</small>`;
+            };
+
+            testRecognition.start();
+        }
+
+        function updateSuggestions() {
+            const text = recentTranscription.toLowerCase();
+            const words = text.split(/\s+/);
+            const recentWords = words.slice(-50); // Look at last 50 words
+            const currentTime = Date.now();
+            
+            // Count keyword occurrences
+            suggestionKeywords.clear();
+            
+            for (const word of recentWords) {
+                const cleanWord = word.replace(/[^\w]/g, ''); // Remove punctuation
+                if (biblicalKeywords[cleanWord]) {
+                    suggestionKeywords.set(cleanWord, (suggestionKeywords.get(cleanWord) || 0) + 1);
+                }
+            }
+
+            // Add keyword-based suggestions to history
+            for (const [keyword, count] of suggestionKeywords.entries()) {
+                const verses = biblicalKeywords[keyword];
+                if (!verses) continue;
+                
+                // Add top 2 verses for this keyword
+                for (let i = 0; i < Math.min(2, verses.length); i++) {
+                    const verse = verses[i];
+                    
+                    // Check if this verse suggestion already exists recently
+                    const existingIndex = suggestionHistory.findIndex(s => 
+                        s.verse === verse && (currentTime - s.timestamp) < 60000 // 1 minute
+                    );
+                    
+                    if (existingIndex === -1) {
+                        // New keyword suggestion
+                        const suggestion = {
+                            type: 'keyword',
+                            text: verse,
+                            verse: verse,
+                            keyword: keyword,
+                            count: count,
+                            timestamp: currentTime,
+                            priority: 500 + count * 10 // Lower priority than direct references
+                        };
+                        
+                        // Insert based on priority but keep newer items first for same priority
+                        let insertIndex = suggestionHistory.findIndex(s => s.priority < suggestion.priority);
+                        if (insertIndex === -1) insertIndex = suggestionHistory.length;
+                        
+                        suggestionHistory.splice(insertIndex, 0, suggestion);
+                    } else {
+                        // Update existing suggestion
+                        suggestionHistory[existingIndex].count = count;
+                        suggestionHistory[existingIndex].timestamp = currentTime;
+                        suggestionHistory[existingIndex].priority = 500 + count * 10;
+                    }
+                }
+            }
+
+            // Also detect direct Bible references in recent transcription
+            detectBibleReferences();
+
+            // Keep only recent suggestions (last 5 minutes)
+            const fiveMinutesAgo = currentTime - (5 * 60 * 1000);
+            suggestionHistory = suggestionHistory.filter(s => s.timestamp > fiveMinutesAgo);
+
+            // Limit total suggestions
+            if (suggestionHistory.length > maxSuggestionHistory) {
+                suggestionHistory = suggestionHistory.slice(0, maxSuggestionHistory);
+            }
+
+            displaySuggestions();
+        }
+
+        function detectBibleReferences() {
+            const text = recentTranscription;
+            const currentTime = Date.now();
+            
+            // More comprehensive patterns for Bible references
+            const patterns = [
+                // Full reference with verse: "John 3:16", "1 Corinthians 13:4", "2 Timothy 3:16"
+                /\b(\d?\s*(?:John|Matthew|Mark|Luke|Acts|Romans|Corinthians|Galatians|Ephesians|Philippians|Colossians|Thessalonians|Timothy|Titus|Philemon|Hebrews|James|Peter|Jude|Revelation|Genesis|Exodus|Leviticus|Numbers|Deuteronomy|Joshua|Judges|Ruth|Samuel|Kings|Chronicles|Ezra|Nehemiah|Esther|Job|Psalms?|Proverbs|Ecclesiastes|Song of Songs|Isaiah|Jeremiah|Lamentations|Ezekiel|Daniel|Hosea|Joel|Amos|Obadiah|Jonah|Micah|Nahum|Habakkuk|Zephaniah|Haggai|Zechariah|Malachi))\s+(\d+):(\d+)(?:-(\d+))?\b/gi,
+                
+                // Book and chapter: "Psalm 23", "Genesis 1", "1 Timothy 4"
+                /\b(\d?\s*(?:John|Matthew|Mark|Luke|Acts|Romans|Corinthians|Galatians|Ephesians|Philippians|Colossians|Thessalonians|Timothy|Titus|Philemon|Hebrews|James|Peter|Jude|Revelation|Genesis|Exodus|Leviticus|Numbers|Deuteronomy|Joshua|Judges|Ruth|Samuel|Kings|Chronicles|Ezra|Nehemiah|Esther|Job|Psalms?|Proverbs|Ecclesiastes|Song of Songs|Isaiah|Jeremiah|Lamentations|Ezekiel|Daniel|Hosea|Joel|Amos|Obadiah|Jonah|Micah|Nahum|Habakkuk|Zephaniah|Haggai|Zechariah|Malachi))\s+(\d+)\b(?!\s*:\d+)/gi,
+                
+                // Just book name (most common ones)
+                /\b(Genesis|Exodus|Psalms?|Proverbs|Isaiah|Jeremiah|Matthew|Mark|Luke|John|Acts|Romans|Corinthians|Galatians|Ephesians|Philippians|Colossians|Hebrews|James|Revelation)\b/gi
+            ];
+
+            const detectedRefs = new Set();
+            
+            patterns.forEach((pattern, index) => {
+                let match;
+                const matches = [...text.matchAll(pattern)];
+                
+                for (const match of matches) {
+                    if (index === 0) {
+                        // Full reference with verse (and possibly verse range)
+                        const refObj = {
+                            type: 'verse',
+                            text: match[0],
+                            book: match[1].trim(),
+                            chapter: parseInt(match[2]),
+                            verse: parseInt(match[3]),
+                            timestamp: currentTime,
+                            priority: 1000
+                        };
+                        if (match[4]) {
+                            refObj.endVerse = parseInt(match[4]);
+                            refObj.text = `${match[1].trim()} ${match[2]}:${match[3]}-${match[4]}`;
+                        }
+                        detectedRefs.add(JSON.stringify(refObj));
+                    } else if (index === 1) {
+                        // Book and chapter only
+                        const refObj = {
+                            type: 'chapter',
+                            text: match[0],
+                            book: match[1].trim(),
+                            chapter: parseInt(match[2]),
+                            timestamp: currentTime,
+                            priority: 999
+                        };
+                        detectedRefs.add(JSON.stringify(refObj));
+                    } else {
+                        // Book name only
+                        const refObj = {
+                            type: 'book',
+                            text: match[0],
+                            book: match[0].trim(),
+                            timestamp: currentTime,
+                            priority: 998
+                        };
+                        detectedRefs.add(JSON.stringify(refObj));
+                    }
+                }
+            });
+
+            // Add detected references to suggestion history
+            for (const refStr of detectedRefs) {
+                const ref = JSON.parse(refStr);
+                
+                // Check if this reference was already detected recently (within 30 seconds)
+                const existingIndex = suggestionHistory.findIndex(s => 
+                    s.text === ref.text && (currentTime - s.timestamp) < 30000
+                );
+                
+                if (existingIndex === -1) {
+                    // New suggestion - add to history
+                    suggestionHistory.unshift(ref);
+                    
+                    // Keep only the most recent suggestions
+                    if (suggestionHistory.length > maxSuggestionHistory) {
+                        suggestionHistory = suggestionHistory.slice(0, maxSuggestionHistory);
+                    }
+                } else {
+                    // Update timestamp of existing suggestion and move to front
+                    suggestionHistory[existingIndex].timestamp = currentTime;
+                    const updated = suggestionHistory.splice(existingIndex, 1)[0];
+                    suggestionHistory.unshift(updated);
+                }
+            }
+        }
+
+        function displaySuggestions() {
+            const suggestionsContainer = document.getElementById('suggestions');
+            const suggestionsList = document.getElementById('suggestionsList');
+            
+            if (suggestionHistory.length === 0) {
+                suggestionsList.style.display = 'none';
+                stopTimestampUpdates();
+                return;
+            }
+
+            suggestionsList.style.display = 'block';
+            suggestionsContainer.innerHTML = '';
+
+            // Sort suggestions by timestamp (newest first) then by priority
+            const sortedSuggestions = [...suggestionHistory]
+                .sort((a, b) => {
+                    // First by priority (higher priority first)
+                    if (a.priority !== b.priority) {
+                        return b.priority - a.priority;
+                    }
+                    // Then by timestamp (newer first)
+                    return b.timestamp - a.timestamp;
+                })
+                .slice(0, 8); // Show top 8 suggestions
+
+            for (const suggestion of sortedSuggestions) {
+                const suggestionDiv = document.createElement('div');
+                suggestionDiv.className = 'suggestion-item';
+                suggestionDiv.setAttribute('data-timestamp', suggestion.timestamp);
+                
+                // Calculate how recent this suggestion is
+                const timeText = getTimeAgoText(suggestion.timestamp);
+
+                if (suggestion.type === 'verse' || suggestion.type === 'chapter' || suggestion.type === 'book') {
+                    // Direct Bible reference from speech
+                    suggestionDiv.style.border = '2px solid var(--button-bg)';
+                    suggestionDiv.style.background = 'var(--preview-bg)';
+                    
+                    if (suggestion.type === 'verse') {
+                        suggestionDiv.onclick = () => navigateToVerse(`${suggestion.book} ${suggestion.chapter}:${suggestion.verse}`);
+                        suggestionDiv.innerHTML = `
+                            <div class="suggestion-ref">📖 ${suggestion.text}</div>
+                            <div class="suggestion-keywords">🎤 Verse mentioned <span class="timestamp">${timeText}</span> - click to navigate</div>
+                        `;
+                    } else if (suggestion.type === 'chapter') {
+                        suggestionDiv.onclick = () => navigateToChapter(suggestion.book, suggestion.chapter);
+                        suggestionDiv.innerHTML = `
+                            <div class="suggestion-ref">📖 ${suggestion.text}</div>
+                            <div class="suggestion-keywords">🎤 Chapter mentioned <span class="timestamp">${timeText}</span> - click to browse</div>
+                        `;
+                    } else {
+                        suggestionDiv.onclick = () => navigateToBook(suggestion.book);
+                        suggestionDiv.innerHTML = `
+                            <div class="suggestion-ref">📖 ${suggestion.text}</div>
+                            <div class="suggestion-keywords">🎤 Book mentioned <span class="timestamp">${timeText}</span> - click to browse</div>
+                        `;
+                    }
+                } else if (suggestion.type === 'keyword') {
+                    // Keyword-based suggestion
+                    suggestionDiv.onclick = () => navigateToVerse(suggestion.verse);
+                    suggestionDiv.innerHTML = `
+                        <div class="suggestion-ref">${suggestion.verse}</div>
+                        <div class="suggestion-keywords">Related to: "${suggestion.keyword}" (${suggestion.count} time${suggestion.count > 1 ? 's' : ''}) • <span class="timestamp">${timeText}</span></div>
+                    `;
+                }
+                
+                suggestionsContainer.appendChild(suggestionDiv);
+            }
+
+            // Start timestamp updates if we have suggestions
+            if (sortedSuggestions.length > 0) {
+                startTimestampUpdates();
+            }
+        }
+
+        function getTimeAgoText(timestamp) {
+            const secondsAgo = Math.floor((Date.now() - timestamp) / 1000);
+            if (secondsAgo < 60) {
+                return `${secondsAgo}s ago`;
+            } else if (secondsAgo < 3600) {
+                return `${Math.floor(secondsAgo / 60)}m ago`;
+            } else {
+                return `${Math.floor(secondsAgo / 3600)}h ago`;
+            }
+        }
+
+        function updateTimestamps() {
+            const timestampElements = document.querySelectorAll('#suggestions .timestamp');
+            const suggestionItems = document.querySelectorAll('#suggestions .suggestion-item');
+            
+            suggestionItems.forEach((item, index) => {
+                const timestamp = parseInt(item.getAttribute('data-timestamp'));
+                if (timestamp && timestampElements[index]) {
+                    timestampElements[index].textContent = getTimeAgoText(timestamp);
+                }
+            });
+        }
+
+        function startTimestampUpdates() {
+            if (timestampUpdateInterval) {
+                clearInterval(timestampUpdateInterval);
+            }
+            
+            // Update timestamps every 10 seconds
+            timestampUpdateInterval = setInterval(updateTimestamps, 10000);
+        }
+
+        function stopTimestampUpdates() {
+            if (timestampUpdateInterval) {
+                clearInterval(timestampUpdateInterval);
+                timestampUpdateInterval = null;
+            }
+        }
+
+        function navigateToVerse(verseRef) {
+            // Parse the verse reference (e.g., "John 3:16")
+            const match = verseRef.match(/^(.+?)\s+(\d+):(\d+)$/);
+            if (!match) return;
+
+            const bookName = match[1];
+            const chapter = parseInt(match[2]);
+            const verse = parseInt(match[3]);
+
+            // Use the existing quick verse input functionality
+            const quickInput = document.getElementById('quickVerseInput');
+            quickInput.value = verseRef;
+            
+            // Trigger the selection
+            selectBookByName(bookName, chapter, verse);
+            
+            // Show feedback
+            const status = document.getElementById('quickVerseStatus');
+            status.innerHTML = `📖 Navigating to ${verseRef} from sermon suggestion`;
+            status.style.color = 'var(--button-bg)';
+        }
+
+        function navigateToChapter(bookName, chapter) {
+            // Navigate to a specific chapter (will show first verse)
+            const quickInput = document.getElementById('quickVerseInput');
+            quickInput.value = `${bookName} ${chapter}:1`;
+            
+            selectBookByName(bookName, chapter, 1);
+            
+            const status = document.getElementById('quickVerseStatus');
+            status.innerHTML = `📖 Navigating to ${bookName} ${chapter} from sermon`;
+            status.style.color = 'var(--button-bg)';
+        }
+
+        function navigateToBook(bookName) {
+            // Navigate to a book (will show chapter 1, verse 1)
+            const quickInput = document.getElementById('quickVerseInput');
+            quickInput.value = `${bookName} 1:1`;
+            
+            selectBookByName(bookName, 1, 1);
+            
+            const status = document.getElementById('quickVerseStatus');
+            status.innerHTML = `📖 Navigating to ${bookName} from sermon`;
+            status.style.color = 'var(--button-bg)';
+        }
+
+        // Initialize speech recognition when page loads
+        window.addEventListener('DOMContentLoaded', function() {
+            initializeSpeechRecognition();
+        });
+
+        // Clean up intervals when page unloads
+        window.addEventListener('beforeunload', function() {
+            stopTimestampUpdates();
+        });
 
         // Connect on page load
         connect();
