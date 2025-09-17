@@ -1,0 +1,93 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <style>
+        body {
+            margin: 0;
+            overflow: hidden;
+            background-color: transparent;
+            font-family: Arial, sans-serif;
+            color: white;
+            text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.7);
+        }
+        .container {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            text-align: center;
+        }
+        #countdown-text {
+            font-size: 150px;
+            font-weight: bold;
+        }
+        #starting-soon {
+            font-size: 80px;
+            font-weight: bold;
+            display: none;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div id="countdown-text"></div>
+        <div id="starting-soon">Starting soon</div>
+    </div>
+
+    <script>
+        const ws = new WebSocket('ws://localhost:8080/ws/obs');
+
+        ws.onopen = function() {
+            console.log('Connected to server');
+        };
+
+        ws.onclose = function() {
+            console.log('Disconnected from server');
+            // Attempt to reconnect after 3 seconds
+            setTimeout(() => {
+                location.reload();
+            }, 3000);
+        };
+
+        let countdownInterval;
+
+        ws.onmessage = function(event) {
+            const data = JSON.parse(event.data);
+
+            if (data.type === 'countdown') {
+                const countdownText = document.getElementById('countdown-text');
+                const startingSoon = document.getElementById('starting-soon');
+
+                if (data.running) {
+                    clearInterval(countdownInterval);
+
+                    const targetTime = new Date(data.targetTime);
+
+                    countdownInterval = setInterval(() => {
+                        const now = new Date();
+                        const diff = targetTime - now;
+
+                        if (diff <= 0) {
+                            clearInterval(countdownInterval);
+                            countdownText.style.display = 'none';
+                            startingSoon.style.display = 'block';
+                            return;
+                        }
+
+                        const minutes = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
+                        const seconds = Math.floor((diff % (1000 * 60)) / 1000);
+
+                        countdownText.textContent = `${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`;
+                        countdownText.style.display = 'block';
+                        startingSoon.style.display = 'none';
+                    }, 1000);
+                } else {
+                    clearInterval(countdownInterval);
+                    countdownText.style.display = 'none';
+                    startingSoon.style.display = 'none';
+                }
+            }
+        };
+    </script>
+</body>
+</html>

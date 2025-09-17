@@ -26,6 +26,12 @@ type Message struct {
 	Show    bool   `json:"show,omitempty"`
 }
 
+type CountdownMessage struct {
+	Type       string `json:"type"`
+	TargetTime int64  `json:"targetTime,omitempty"`
+	Running    bool   `json:"running"`
+}
+
 type BibleData struct {
 	Books []BibleBook `json:"books"`
 }
@@ -374,6 +380,17 @@ func handleControlWebSocket(w http.ResponseWriter, r *http.Request) {
 		}
 
 		switch msgType.Type {
+		case "countdown":
+			var countdownMsg CountdownMessage
+			if err := json.Unmarshal(rawMsg, &countdownMsg); err == nil {
+				// Forward message to OBS client
+				if obsClient != nil {
+					err := obsClient.WriteJSON(countdownMsg)
+					if err != nil {
+						log.Println("Error sending countdown to OBS:", err)
+					}
+				}
+			}
 		case "search":
 			var searchReq SearchRequest
 			if err := json.Unmarshal(rawMsg, &searchReq); err == nil {
