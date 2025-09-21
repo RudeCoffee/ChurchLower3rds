@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"strconv"
 	"strings"
+	"sync"
 
 	"github.com/gorilla/websocket"
 )
@@ -82,7 +83,8 @@ type VersesResponse struct {
 	Verses  []int  `json:"verses"`
 }
 
-var obsClient *websocket.Conn
+var obsClients []*websocket.Conn
+var obsClientsMutex sync.Mutex
 var controlClients []*websocket.Conn
 var bibleData BibleData
 var speakers []string
@@ -332,14 +334,24 @@ func handleOBSWebSocket(w http.ResponseWriter, r *http.Request) {
 	}
 	defer conn.Close()
 
-	obsClient = conn
+	obsClientsMutex.Lock()
+	obsClients = append(obsClients, conn)
+	obsClientsMutex.Unlock()
 	log.Println("OBS client connected")
 
 	for {
 		_, _, err := conn.ReadMessage()
 		if err != nil {
 			log.Println("OBS client disconnected:", err)
-			obsClient = nil
+			obsClientsMutex.Lock()
+			// Remove the connection from the slice
+			for i, client := range obsClients {
+				if client == conn {
+					obsClients = append(obsClients[:i], obsClients[i+1:]...)
+					break
+				}
+			}
+			obsClientsMutex.Unlock()
 			break
 		}
 	}
@@ -383,13 +395,14 @@ func handleControlWebSocket(w http.ResponseWriter, r *http.Request) {
 		case "countdown":
 			var countdownMsg CountdownMessage
 			if err := json.Unmarshal(rawMsg, &countdownMsg); err == nil {
-				// Forward message to OBS client
-				if obsClient != nil {
-					err := obsClient.WriteJSON(countdownMsg)
+				obsClientsMutex.Lock()
+				for _, client := range obsClients {
+					err := client.WriteJSON(countdownMsg)
 					if err != nil {
 						log.Println("Error sending countdown to OBS:", err)
 					}
 				}
+				obsClientsMutex.Unlock()
 			}
 		case "search":
 			var searchReq SearchRequest
@@ -482,9 +495,11 @@ func handleControlWebSocket(w http.ResponseWriter, r *http.Request) {
 						Verse: verse.Text,
 						Show:  true,
 					}
-					if obsClient != nil {
-						obsClient.WriteJSON(obsMsg)
+					obsClientsMutex.Lock()
+					for _, client := range obsClients {
+						client.WriteJSON(obsMsg)
 					}
+					obsClientsMutex.Unlock()
 				}
 			}
 
@@ -505,9 +520,11 @@ func handleControlWebSocket(w http.ResponseWriter, r *http.Request) {
 						Verse: nextVerse.Text,
 						Show:  true,
 					}
-					if obsClient != nil {
-						obsClient.WriteJSON(obsMsg)
+					obsClientsMutex.Lock()
+					for _, client := range obsClients {
+						client.WriteJSON(obsMsg)
 					}
+					obsClientsMutex.Unlock()
 
 					// Send response back to control client with new verse info
 					response := struct {
@@ -590,13 +607,14 @@ func handleControlWebSocket(w http.ResponseWriter, r *http.Request) {
 			// Handle regular message (speaker, show/hide, etc.)
 			var msg Message
 			if err := json.Unmarshal(rawMsg, &msg); err == nil {
-				// Forward message to OBS client
-				if obsClient != nil {
-					err := obsClient.WriteJSON(msg)
+				obsClientsMutex.Lock()
+				for _, client := range obsClients {
+					err := client.WriteJSON(msg)
 					if err != nil {
 						log.Println("Error sending to OBS:", err)
 					}
 				}
+				obsClientsMutex.Unlock()
 			}
 		}
 	}
