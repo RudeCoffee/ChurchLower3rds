@@ -1814,34 +1814,28 @@
                     }
                 }
 
-                const currentTranscript = finalTranscript + interimTranscript;
-                document.getElementById('transcriptionText').textContent = currentTranscript;
+                const fullLiveTranscript = finalTranscript + interimTranscript;
+                document.getElementById('transcriptionText').textContent = fullLiveTranscript;
 
-                // --- Accurate Sequential Highlighting (based on finalized text) ---
-                if (finalTranscript) {
-                    recentTranscription += finalTranscript + ' ';
-                    const finalizedWords = finalTranscript.toLowerCase().replace(/[^\w\s]/g, '').split(' ');
+                // --- Live, Sequential Highlighting using Interim Transcript ---
+                if (interimTranscript && currentVerseWords.length > 0) {
+                    const spokenWords = interimTranscript.toLowerCase().replace(/[^\w\s]/g, '').split(' ');
 
-                    for (const spokenWord of finalizedWords) {
-                        if (!spokenWord || currentVerseWords.length === 0) continue;
+                    for (const spokenWord of spokenWords) {
+                        if (!spokenWord) continue;
 
-                        // Find the next occurrence of the spoken word in the verse
-                        const nextWordIndex = currentVerseWords.indexOf(spokenWord, lastSpokenWordIndex + 1);
+                        const searchStartIndex = lastSpokenWordIndex + 1;
+                        const searchEndIndex = Math.min(searchStartIndex + 5, currentVerseWords.length);
 
-                        // To be a valid sequential match, it must be reasonably close to the last match
-                        if (nextWordIndex !== -1 && (nextWordIndex - lastSpokenWordIndex) < 5) {
-                            for (let i = lastSpokenWordIndex + 1; i <= nextWordIndex; i++) {
-                                document.getElementById(`word-${i}`)?.classList.add('word-spoken');
+                        for (let i = searchStartIndex; i < searchEndIndex; i++) {
+                            if (currentVerseWords[i] === spokenWord) {
+                                for (let j = lastSpokenWordIndex + 1; j <= i; j++) {
+                                    document.getElementById(`word-${j}`)?.classList.add('word-spoken');
+                                }
+                                lastSpokenWordIndex = i;
+                                break;
                             }
-                            lastSpokenWordIndex = nextWordIndex;
                         }
-                    }
-
-                    // Throttle suggestions
-                    const now = Date.now();
-                    if (now - lastSuggestionUpdate > 2000) {
-                        updateSuggestions();
-                        lastSuggestionUpdate = now;
                     }
                 }
 
@@ -1849,13 +1843,12 @@
                 if (currentVerseWords.length > 0) {
                     const progressPercentage = ((lastSpokenWordIndex + 1) / currentVerseWords.length) * 100;
 
-                    // Check for advance trigger only when nearing the end of the current verse
                     if (nextVerseTextForMatching && progressPercentage > 70) {
                         const nextVerseStartWords = nextVerseTextForMatching.toLowerCase().split(' ').slice(0, 3);
-                        const recentTranscriptWords = new Set(currentTranscript.toLowerCase().split(' ').slice(-10));
+                        const liveWords = new Set(fullLiveTranscript.toLowerCase().split(' ').slice(-10));
                         let matchCount = 0;
                         for (const word of nextVerseStartWords) {
-                            if (recentTranscriptWords.has(word.replace(/[^\w\s]/gi, ''))) {
+                            if (liveWords.has(word.replace(/[^\w\s]/gi, ''))) {
                                 matchCount++;
                             }
                         }
@@ -1873,6 +1866,16 @@
                                 }
                             }
                         }
+                    }
+                }
+
+                // --- Final Transcript Processing for Suggestions ---
+                if (finalTranscript) {
+                    recentTranscription += finalTranscript + ' ';
+                    const now = Date.now();
+                    if (now - lastSuggestionUpdate > 2000) {
+                        updateSuggestions();
+                        lastSuggestionUpdate = now;
                     }
                 }
             };
