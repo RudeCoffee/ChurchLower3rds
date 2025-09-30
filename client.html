@@ -496,6 +496,8 @@
         let nextVerseTextForMatching = '';
         let isNavigatingFromSuggestion = false;
         let lastHighlightedVerseIndex = -1;
+        let currentVerseWords = [];
+        let lastSpokenWordIndex = -1;
         
         // Additional variables for consistency
         let currentBook = '';
@@ -1284,13 +1286,15 @@
             // Store current verse data for display
             currentVerseData = verse;
 
-            // Reset highlighting for the new verse
+            // Reset highlighting and progress tracking for the new verse
             lastHighlightedVerseIndex = -1;
+            lastSpokenWordIndex = -1;
+            currentVerseWords = verse.text.toLowerCase().replace(/[^\w\s]/g, '').split(' ');
             
             // Update the preview display with clear formatting
             document.getElementById('verseReference').textContent = verseReference;
             const verseTextContainer = document.getElementById('verseText');
-            verseTextContainer.innerHTML = verse.text.split(' ').map(word => `<span class="word">${word}</span>`).join(' ');
+            verseTextContainer.innerHTML = verse.text.split(' ').map((word, index) => `<span class="word" id="word-${index}">${word}</span>`).join(' ');
             document.getElementById('versePreview').style.display = 'block';
             document.getElementById('displayBtn').disabled = false;
             
@@ -1813,22 +1817,23 @@
                 const currentTranscript = finalTranscript + interimTranscript;
                 document.getElementById('transcriptionText').textContent = currentTranscript;
 
-                // --- Sequential Highlighting based on FINALIZED text for accuracy ---
+                // --- Accurate Sequential Highlighting (based on finalized text) ---
                 if (finalTranscript) {
                     recentTranscription += finalTranscript + ' ';
-                    const verseWordSpans = document.querySelectorAll('#verseText .word');
-                    if (verseWordSpans.length > 0) {
-                        const finalizedWords = finalTranscript.toLowerCase().replace(/[^\w\s]/g, '').split(' ');
-                        for (const spokenWord of finalizedWords) {
-                            if (!spokenWord) continue;
-                            for (let i = lastHighlightedVerseIndex + 1; i < verseWordSpans.length; i++) {
-                                const verseWord = verseWordSpans[i].textContent.toLowerCase().replace(/[^\w\s]/g, '');
-                                if (verseWord === spokenWord) {
-                                    verseWordSpans[i].classList.add('word-spoken');
-                                    lastHighlightedVerseIndex = i;
-                                    break;
-                                }
+                    const finalizedWords = finalTranscript.toLowerCase().replace(/[^\w\s]/g, '').split(' ');
+
+                    for (const spokenWord of finalizedWords) {
+                        if (!spokenWord || currentVerseWords.length === 0) continue;
+
+                        // Find the next occurrence of the spoken word in the verse
+                        const nextWordIndex = currentVerseWords.indexOf(spokenWord, lastSpokenWordIndex + 1);
+
+                        // To be a valid sequential match, it must be reasonably close to the last match
+                        if (nextWordIndex !== -1 && (nextWordIndex - lastSpokenWordIndex) < 5) {
+                            for (let i = lastSpokenWordIndex + 1; i <= nextWordIndex; i++) {
+                                document.getElementById(`word-${i}`)?.classList.add('word-spoken');
                             }
+                            lastSpokenWordIndex = nextWordIndex;
                         }
                     }
 
@@ -1840,12 +1845,11 @@
                     }
                 }
 
-                // --- Smart Auto-Advance Check (using full transcript for responsiveness) ---
-                const verseWordSpans = document.querySelectorAll('#verseText .word');
-                if (verseWordSpans.length > 0) {
-                    const spokenWordCount = document.querySelectorAll('#verseText .word-spoken').length;
-                    const progressPercentage = (spokenWordCount / verseWordSpans.length) * 100;
+                // --- Smart Auto-Advance Check ---
+                if (currentVerseWords.length > 0) {
+                    const progressPercentage = ((lastSpokenWordIndex + 1) / currentVerseWords.length) * 100;
 
+                    // Check for advance trigger only when nearing the end of the current verse
                     if (nextVerseTextForMatching && progressPercentage > 70) {
                         const nextVerseStartWords = nextVerseTextForMatching.toLowerCase().split(' ').slice(0, 3);
                         const recentTranscriptWords = new Set(currentTranscript.toLowerCase().split(' ').slice(-10));
