@@ -238,6 +238,15 @@
             line-height: 1.5;
             color: var(--text-color);
         }
+        .verse-text .word {
+            transition: background-color 0.3s, color 0.3s;
+        }
+        .verse-text .word-spoken {
+            background-color: var(--button-bg);
+            color: white;
+            border-radius: 3px;
+            padding: 0 2px;
+        }
         .search-results {
             max-height: 300px;
             overflow-y: auto;
@@ -1268,7 +1277,8 @@
             
             // Update the preview display with clear formatting
             document.getElementById('verseReference').textContent = verseReference;
-            document.getElementById('verseText').textContent = verse.text;
+            const verseTextContainer = document.getElementById('verseText');
+            verseTextContainer.innerHTML = verse.text.split(' ').map(word => `<span class="word">${word}</span>`).join(' ');
             document.getElementById('versePreview').style.display = 'block';
             document.getElementById('displayBtn').disabled = false;
             
@@ -1791,23 +1801,40 @@
                 const currentTranscript = finalTranscript + interimTranscript;
                 document.getElementById('transcriptionText').textContent = currentTranscript;
 
-                // Check for auto-advance trigger using the real-time interim transcript for speed
-                if (isAutoAdvanceActive && nextVerseTextForMatching && interimTranscript) {
-                    const interimWords = new Set(interimTranscript.toLowerCase().split(' '));
-                    const nextVerseWords = nextVerseTextForMatching.toLowerCase().split(' ').slice(0, 3);
+                // --- Smart Auto-Advance and Progress Visualization ---
 
-                    let matchCount = 0;
-                    for (const word of nextVerseWords) {
-                        if (interimWords.has(word.replace(/[^\w\s]/gi, ''))) {
-                            matchCount++;
+                const verseWords = document.querySelectorAll('#verseText .word');
+                if (verseWords.length > 0) {
+                    const spokenWords = new Set(currentTranscript.toLowerCase().replace(/[^\w\s]/g, '').split(' '));
+                    let spokenWordCount = 0;
+
+                    verseWords.forEach(wordSpan => {
+                        const word = wordSpan.textContent.toLowerCase().replace(/[^\w\s]/g, '');
+                        if (word && spokenWords.has(word)) {
+                            wordSpan.classList.add('word-spoken');
+                            spokenWordCount++;
                         }
-                    }
+                    });
 
-                    // Require at least 2 of the first 3 words to match for an instant response
-                    if (nextVerseWords.length > 0 && matchCount >= 2) {
-                        console.log(`Auto-advancing to next verse (matched ${matchCount}/${nextVerseWords.length} words from interim transcript)...`);
-                        nextVerse();
-                        nextVerseTextForMatching = ''; // Clear after advancing
+                    const progressPercentage = (spokenWordCount / verseWords.length) * 100;
+
+                    // Only check for the next verse if we are over 70% through the current one
+                    if (isAutoAdvanceActive && nextVerseTextForMatching && progressPercentage > 70) {
+                        const nextVerseStartWords = nextVerseTextForMatching.toLowerCase().split(' ').slice(0, 3);
+                        const recentTranscriptWords = new Set(currentTranscript.toLowerCase().split(' ').slice(-10));
+
+                        let matchCount = 0;
+                        for (const word of nextVerseStartWords) {
+                            if (recentTranscriptWords.has(word.replace(/[^\w\s]/gi, ''))) {
+                                matchCount++;
+                            }
+                        }
+
+                        if (nextVerseStartWords.length > 0 && matchCount >= 2) {
+                            console.log(`Auto-advancing (progress: ${progressPercentage.toFixed(0)}%, matched ${matchCount}/${nextVerseStartWords.length} words)...`);
+                            nextVerse();
+                            nextVerseTextForMatching = ''; // Clear after advancing
+                        }
                     }
                 }
                 
