@@ -100,6 +100,14 @@
         .auto-advance-btn.active {
             background-color: var(--success-bg);
         }
+        @keyframes flash {
+            0% { background-color: var(--button-bg); }
+            50% { background-color: var(--success-bg); transform: scale(1.05); }
+            100% { background-color: var(--button-bg); }
+        }
+        .flash-alert {
+            animation: flash 1s 3; /* Flash 3 times over 3 seconds */
+        }
         .nav-button {
             background-color: var(--button-bg);
             color: white;
@@ -1805,35 +1813,42 @@
                 const currentTranscript = finalTranscript + interimTranscript;
                 document.getElementById('transcriptionText').textContent = currentTranscript;
 
-                // --- Smart Auto-Advance and Progress Visualization with Sequential Matching ---
-                const verseWords = document.querySelectorAll('#verseText .word');
-                if (verseWords.length > 0 && interimTranscript) {
-                    const spokenWords = interimTranscript.toLowerCase().replace(/[^\w\s]/g, '').split(' ');
-
-                    for (const spokenWord of spokenWords) {
-                        if (!spokenWord) continue;
-
-                        // Start searching from the word after the last highlighted one
-                        for (let i = lastHighlightedVerseIndex + 1; i < verseWords.length; i++) {
-                            const verseWordSpan = verseWords[i];
-                            const verseWord = verseWordSpan.textContent.toLowerCase().replace(/[^\w\s]/g, '');
-
-                            if (verseWord === spokenWord) {
-                                verseWordSpan.classList.add('word-spoken');
-                                lastHighlightedVerseIndex = i;
-                                break; // Move to the next spoken word
+                // --- Sequential Highlighting based on FINALIZED text for accuracy ---
+                if (finalTranscript) {
+                    recentTranscription += finalTranscript + ' ';
+                    const verseWordSpans = document.querySelectorAll('#verseText .word');
+                    if (verseWordSpans.length > 0) {
+                        const finalizedWords = finalTranscript.toLowerCase().replace(/[^\w\s]/g, '').split(' ');
+                        for (const spokenWord of finalizedWords) {
+                            if (!spokenWord) continue;
+                            for (let i = lastHighlightedVerseIndex + 1; i < verseWordSpans.length; i++) {
+                                const verseWord = verseWordSpans[i].textContent.toLowerCase().replace(/[^\w\s]/g, '');
+                                if (verseWord === spokenWord) {
+                                    verseWordSpans[i].classList.add('word-spoken');
+                                    lastHighlightedVerseIndex = i;
+                                    break;
+                                }
                             }
                         }
                     }
 
-                    const spokenWordCount = document.querySelectorAll('#verseText .word-spoken').length;
-                    const progressPercentage = (spokenWordCount / verseWords.length) * 100;
+                    // Throttle suggestions
+                    const now = Date.now();
+                    if (now - lastSuggestionUpdate > 2000) {
+                        updateSuggestions();
+                        lastSuggestionUpdate = now;
+                    }
+                }
 
-                    // Only check for the next verse if we are over 70% through the current one
-                    if (isAutoAdvanceActive && nextVerseTextForMatching && progressPercentage > 70) {
+                // --- Smart Auto-Advance Check (using full transcript for responsiveness) ---
+                const verseWordSpans = document.querySelectorAll('#verseText .word');
+                if (verseWordSpans.length > 0) {
+                    const spokenWordCount = document.querySelectorAll('#verseText .word-spoken').length;
+                    const progressPercentage = (spokenWordCount / verseWordSpans.length) * 100;
+
+                    if (nextVerseTextForMatching && progressPercentage > 70) {
                         const nextVerseStartWords = nextVerseTextForMatching.toLowerCase().split(' ').slice(0, 3);
                         const recentTranscriptWords = new Set(currentTranscript.toLowerCase().split(' ').slice(-10));
-
                         let matchCount = 0;
                         for (const word of nextVerseStartWords) {
                             if (recentTranscriptWords.has(word.replace(/[^\w\s]/gi, ''))) {
@@ -1842,26 +1857,18 @@
                         }
 
                         if (nextVerseStartWords.length > 0 && matchCount >= 2) {
-                            console.log(`Auto-advancing (progress: ${progressPercentage.toFixed(0)}%, matched ${matchCount}/${nextVerseStartWords.length} words)...`);
-                            nextVerse();
-                            nextVerseTextForMatching = ''; // Clear after advancing
+                            if (isAutoAdvanceActive) {
+                                console.log(`Auto-advancing (progress: ${progressPercentage.toFixed(0)}%)...`);
+                                nextVerse();
+                                nextVerseTextForMatching = '';
+                            } else {
+                                const nextBtn = document.getElementById('nextBtn');
+                                if (!nextBtn.classList.contains('flash-alert')) {
+                                    nextBtn.classList.add('flash-alert');
+                                    setTimeout(() => nextBtn.classList.remove('flash-alert'), 3000);
+                                }
+                            }
                         }
-                    }
-                }
-                
-                if (finalTranscript) {
-                    recentTranscription += finalTranscript + ' ';
-                    // Keep only last 200 words to prevent memory issues
-                    const words = recentTranscription.split(' ');
-                    if (words.length > 200) {
-                        recentTranscription = words.slice(-200).join(' ');
-                    }
-                    
-                    // Throttle suggestions to once every 2 seconds
-                    const now = Date.now();
-                    if (now - lastSuggestionUpdate > 2000) {
-                        updateSuggestions();
-                        lastSuggestionUpdate = now;
                     }
                 }
             };
