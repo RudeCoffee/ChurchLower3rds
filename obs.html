@@ -1,194 +1,113 @@
 <!DOCTYPE html>
 <head>
-
+    <title>OBS Display</title>
     <style>
+        /* FONT: Imports a cleaner font for display */
+        @import url('https://fonts.googleapis.com/css2?family=Lato:wght@400;700&display=swap');
+
         body {
+            font-family: 'Lato', sans-serif;
             margin: 0;
             overflow: hidden;
             background-color: transparent;
         }
-        .bible {
-            position: absolute;
-            font-family: Arial, sans-serif;
-            color: white;
-            text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.7);
-            transition: opacity 1s ease-in-out;
+
+        /* NEW: Main container for the entire graphic */
+        .lower-third {
+            position: fixed;
+            bottom: 50px;
+            left: 50px;
+            display: flex;
+            align-items: center;
+            
+            /* Animation is now on the container */
             opacity: 0;
+            transform: translateY(20px);
+            transition: opacity 0.5s ease-out, transform 0.5s ease-out;
         }
-        #bibleBook {
-            bottom: 80px;
-            left: 20px;
-            font-size: 45px;
-            font-weight: bold;
-            max-width: calc(100% - 40px);
-            z-index: 1;
+
+        /* NEW: Logo styling */
+        .logo {
+            width: 100px;
+            height: 100px;
+            border-radius: 50%;
+            margin-right: -20px; /* Overlaps the text box */
+            z-index: 10;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.4);
         }
-        #bibleVerse {
-            bottom: 25px;
-            left: 20px;
-            font-size: 40px;
-            max-width: calc(100% - 40px);
-            line-height: 1.4;
-            z-index: 1;
-        }
-        #bibleBackground {
-            bottom: 10px;
-            left: 10px;
-            width: calc(100% - 20px);
-            height: 150px;
-            background-color: rgba(0, 0, 0, 0.85);
-            z-index: -1;
-            border-radius: 8px;
-        }
-        .speaker {
-            position: absolute;
-            font-family: Arial, sans-serif;
+
+        /* NEW: This is the blue box */
+        .text-container {
+            background-color: #2a5a82; /* Branded blue color */
             color: white;
-            text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.7);
-            transition: opacity 1s ease-in-out;
-            opacity: 0;
+            padding: 20px 25px 20px 40px; /* Padding to clear the logo */
+            border-radius: 10px;
+            box-shadow: 0 4px 8px rgba(0,0,0,0.2);
+            max-width: 900px;
+            text-shadow: 1px 1px 2px rgba(0,0,0,0.2);
         }
-        #speakerText {
-            bottom: 25px;
-            left: 10px;
-            font-size: 70px;
-            font-weight: bold;
-            width: calc(100% - 20px);
-            text-align: center;
-            z-index: 1;
+
+        /* UPDATED: Styles for the scripture reference */
+        .reference {
+            font-weight: 700;
+            font-size: 26px;
+            margin-bottom: 6px;
         }
-        #speakerBackground {
-            bottom: 10px;
-            left: 10px;
-            width: calc(100% - 20px);
-            height: 120px;
-            background-color: rgba(0, 0, 0, 0.85);
-            z-index: -1;
-            border-radius: 8px;
+
+        /* UPDATED: Styles for the verse text */
+        .text {
+            font-weight: 400;
+            font-size: 22px;
+            line-height: 1.5; /* Better readability */
         }
+        
+        /* This class will now be applied to the main container to show/hide it */
         .visible {
             opacity: 1 !important;
+            transform: translateY(0) !important;
         }
     </style>
-
-
 </head>
 <body>
-    <div id="bibleBook" class="bible">John 3:16</div>
-    <div id="bibleVerse" class="bible">For God so loved the world...</div>
-    <div id="bibleBackground" class="bible"></div>
-    
-    <div id="speakerText" class="speaker">Pastor John</div>
-    <div id="speakerBackground" class="speaker"></div>
+    <div id="lowerThirdContainer" class="lower-third">
+        <img class="logo" src="logoTransparent.png">
+        <div class="text-container">
+            <div id="bibleReference" class="reference"></div>
+            <div id="bibleText" class="text"></div>
+        </div>
+    </div>
 
     <script>
         const ws = new WebSocket('ws://localhost:8080/ws/obs');
         
-        function adjustBibleLayout() {
-            const bibleVerse = document.getElementById('bibleVerse');
-            const bibleBook = document.getElementById('bibleBook');
-            const bibleBackground = document.getElementById('bibleBackground');
-            
-            // Force a reflow to get accurate measurements
-            bibleVerse.style.height = 'auto';
-            
-            // Measure the actual height of the verse text
-            const verseHeight = bibleVerse.scrollHeight;
-            const bookHeight = bibleBook.scrollHeight;
-            
-            // Calculate total height needed
-            // Base padding (25px bottom + spacing + book height + top padding)
-            const basePadding = 25 + 15; // bottom padding + spacing between book and verse
-            const topPadding = 15;
-            const totalHeight = basePadding + verseHeight + bookHeight + topPadding;
-            
-            // Set minimum height of 150px, but expand if needed
-            const finalHeight = Math.max(150, totalHeight);
-            
-            // Adjust background height
-            bibleBackground.style.height = finalHeight + 'px';
-            
-            // Adjust book position based on verse height
-            const bookBottom = 25 + verseHeight + 15; // verse bottom + verse height + spacing
-            bibleBook.style.bottom = bookBottom + 'px';
-        }
-        
         ws.onmessage = function(event) {
             const data = JSON.parse(event.data);
-            
-            if (data.type === 'bible') {
-                const bibleElements = document.querySelectorAll('.bible');
-                const speakerElements = document.querySelectorAll('.speaker');
-                
+            const lowerThird = document.getElementById('lowerThirdContainer');
+            const referenceEl = document.getElementById('bibleReference');
+            const textEl = document.getElementById('bibleText');
+
+            // This single function handles both Bible verses and Speaker names
+            if (data.type === 'bible' || data.type === 'speaker') {
                 if (data.show) {
-                    // Hide speaker first if it's visible
-                    if (document.querySelector('.speaker.visible')) {
-                        speakerElements.forEach(el => el.classList.remove('visible'));
-                        setTimeout(() => {
-                            document.getElementById('speakerText').textContent = '';
-                        }, 1000);
-                    }
-                    
-                    // Set text content first
-                    document.getElementById('bibleBook').textContent = data.book || '';
-                    document.getElementById('bibleVerse').textContent = data.verse || '';
-                    
-                    // Adjust layout based on content size
-                    setTimeout(() => {
-                        adjustBibleLayout();
-                        // Show bible verse after layout adjustment
-                        bibleElements.forEach(el => el.classList.add('visible'));
-                    }, 10);
+                    // Update the text content
+                    // It works for speakers too, putting the name in the reference line
+                    referenceEl.textContent = data.book || data.speaker || '';
+                    textEl.textContent = data.verse || ''; // Speaker has no verse, so this becomes blank
+
+                    // Add 'visible' class to fade in the whole graphic
+                    lowerThird.classList.add('visible');
                 } else {
-                    // Start fade out first
-                    bibleElements.forEach(el => el.classList.remove('visible'));
-                    // Clear text after fade animation completes (1 second)
-                    setTimeout(() => {
-                        document.getElementById('bibleBook').textContent = '';
-                        document.getElementById('bibleVerse').textContent = '';
-                        // Reset to default layout
-                        document.getElementById('bibleBackground').style.height = '150px';
-                        document.getElementById('bibleBook').style.bottom = '80px';
-                    }, 1000);
-                }
-            } else if (data.type === 'speaker') {
-                const speakerElements = document.querySelectorAll('.speaker');
-                const bibleElements = document.querySelectorAll('.bible');
-                
-                if (data.show) {
-                    // Hide bible verse first if it's visible
-                    if (document.querySelector('.bible.visible')) {
-                        bibleElements.forEach(el => el.classList.remove('visible'));
-                        setTimeout(() => {
-                            document.getElementById('bibleBook').textContent = '';
-                            document.getElementById('bibleVerse').textContent = '';
-                        }, 1000);
-                    }
-                    
-                    // Set text content first, then show speaker
-                    document.getElementById('speakerText').textContent = data.speaker || '';
-                    speakerElements.forEach(el => el.classList.add('visible'));
-                } else {
-                    // Start fade out first
-                    speakerElements.forEach(el => el.classList.remove('visible'));
-                    // Clear text after fade animation completes (1 second)
-                    setTimeout(() => {
-                        document.getElementById('speakerText').textContent = '';
-                    }, 1000);
+                    // Remove 'visible' class to fade out
+                    lowerThird.classList.remove('visible');
                 }
             }
         };
         
-        ws.onopen = function() {
-            console.log('Connected to server');
-        };
+        ws.onopen = () => console.log('Connected to server');
         
-        ws.onclose = function() {
-            console.log('Disconnected from server');
-            // Attempt to reconnect after 3 seconds
-            setTimeout(() => {
-                location.reload();
-            }, 3000);
+        ws.onclose = () => {
+            console.log('Disconnected from server. Reloading in 3 seconds...');
+            setTimeout(() => location.reload(), 3000);
         };
     </script>
 </body>
