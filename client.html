@@ -1738,6 +1738,7 @@
         let isListening = false;
         let recentTranscription = '';
         let suggestionKeywords = new Map();
+        let keywordWindow = [];
         let lastSuggestionUpdate = 0;
         let suggestionHistory = []; // Track suggestions with timestamps
         let maxSuggestionHistory = 10; // Keep last 10 suggestions
@@ -1818,32 +1819,28 @@
 
                 document.getElementById('transcriptionText').textContent = finalizedTranscriptForVerse + finalTranscript + interimTranscript;
 
+                // --- Fault-Tolerant Verse Tracking ---
                 if (currentVerseWords.length > 0) {
-                    // 1. Update running transcript
                     if (finalTranscript) {
                         finalizedTranscriptForVerse += finalTranscript;
                     }
 
-                    // 2. Perform fault-tolerant matching on the finalized transcript
                     const finalizedWords = finalizedTranscriptForVerse.toLowerCase().replace(/[^\w\s]/g, '').split(' ').filter(w => w);
                     let lastMatchIndex = -1;
 
-                    // Reset all highlights
                     for (let i = 0; i < currentVerseWords.length; i++) {
                         document.getElementById(`word-${i}`)?.classList.remove('word-spoken');
                     }
 
                     let verseWordPointer = 0;
                     let spokenWordPointer = 0;
-                    const lookahead = 5; // How many words to look ahead in the verse for a match
+                    const lookahead = 5;
 
                     while (spokenWordPointer < finalizedWords.length && verseWordPointer < currentVerseWords.length) {
                         if (finalizedWords[spokenWordPointer] === currentVerseWords[verseWordPointer]) {
-                            // Perfect match, advance both.
                             verseWordPointer++;
                             spokenWordPointer++;
                         } else {
-                            // Mismatch. Look for a resync point in the verse within the lookahead window.
                             let resyncIndex = -1;
                             for (let i = 1; i <= lookahead && (verseWordPointer + i) < currentVerseWords.length; i++) {
                                 if (finalizedWords[spokenWordPointer] === currentVerseWords[verseWordPointer + i]) {
@@ -1851,26 +1848,20 @@
                                     break;
                                 }
                             }
-
                             if (resyncIndex !== -1) {
-                                // Resync found. Jump verse pointer.
                                 verseWordPointer = resyncIndex + 1;
                                 spokenWordPointer++;
                             } else {
-                                // No resync found. Assume transcription error. Skip spoken word.
                                 spokenWordPointer++;
                             }
                         }
                     }
 
-                    // Highlight based on the `verseWordPointer` which indicates how many words we've successfully matched.
                     lastMatchIndex = verseWordPointer - 1;
                     for (let i = 0; i <= lastMatchIndex; i++) {
                          document.getElementById(`word-${i}`)?.classList.add('word-spoken');
                     }
 
-
-                    // 3. Use live (interim) transcript for temporary highlighting
                     const interimWords = interimTranscript.toLowerCase().replace(/[^\w\s]/g, '').split(' ').filter(w => w);
                     let tempVersePointer = lastMatchIndex + 1;
                     for (const interimWord of interimWords) {
@@ -1880,7 +1871,6 @@
                         }
                     }
 
-                    // 4. Smart Auto-Advance Check (based on the *finalized* match progress)
                     if (nextVerseTextForMatching && lastMatchIndex === currentVerseWords.length - 1) {
                          const nextVerseStartWords = nextVerseTextForMatching.toLowerCase().split(' ').slice(0, 3);
                          const allLiveWords = (finalTranscript + interimTranscript).toLowerCase().split(' ');
@@ -1891,7 +1881,6 @@
                                  matchCount++;
                              }
                          }
-
                          if (nextVerseStartWords.length > 0 && matchCount >= 2) {
                              if (isAutoAdvanceActive) {
                                  console.log(`Auto-advancing (verse complete)...`);
@@ -1908,9 +1897,31 @@
                     }
                 }
 
-                // 5. Suggestion Update Processing
+                // --- Efficient, Incremental Suggestion Update ---
                 if (finalTranscript) {
-                    recentTranscription += finalTranscript + ' ';
+                    recentTranscription += finalTranscript; // Keep full history for scripture reference detection
+
+                    const newWords = finalTranscript.toLowerCase().replace(/[^\w\s]/g, '').split(' ').filter(w => w);
+
+                    for (const newWord of newWords) {
+                        keywordWindow.push(newWord);
+                        if (biblicalKeywords[newWord]) {
+                            suggestionKeywords.set(newWord, (suggestionKeywords.get(newWord) || 0) + 1);
+                        }
+
+                        if (keywordWindow.length > 50) {
+                            const oldWord = keywordWindow.shift();
+                            if (biblicalKeywords[oldWord]) {
+                                const currentCount = suggestionKeywords.get(oldWord);
+                                if (currentCount > 1) {
+                                    suggestionKeywords.set(oldWord, currentCount - 1);
+                                } else {
+                                    suggestionKeywords.delete(oldWord);
+                                }
+                            }
+                        }
+                    }
+
                     const now = Date.now();
                     if (now - lastSuggestionUpdate > 2000) {
                         updateSuggestions();
@@ -2028,22 +2039,9 @@
         }
 
         function updateSuggestions() {
-            const text = recentTranscription.toLowerCase();
-            const words = text.split(/\s+/);
-            const recentWords = words.slice(-50); // Look at last 50 words
             const currentTime = Date.now();
             
-            // Count keyword occurrences
-            suggestionKeywords.clear();
-            
-            for (const word of recentWords) {
-                const cleanWord = word.replace(/[^\w]/g, ''); // Remove punctuation
-                if (biblicalKeywords[cleanWord]) {
-                    suggestionKeywords.set(cleanWord, (suggestionKeywords.get(cleanWord) || 0) + 1);
-                }
-            }
-
-            // Add keyword-based suggestions to history
+            // Add keyword-based suggestions to history (suggestionKeywords is now updated incrementally)
             for (const [keyword, count] of suggestionKeywords.entries()) {
                 const verses = biblicalKeywords[keyword];
                 if (!verses) continue;
