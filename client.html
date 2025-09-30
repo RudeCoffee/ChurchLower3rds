@@ -1817,49 +1817,49 @@
                 const fullLiveTranscript = finalTranscript + interimTranscript;
                 document.getElementById('transcriptionText').textContent = fullLiveTranscript;
 
-                // --- Accurate, Sequential Highlighting from Finalized Text ---
-                if (finalTranscript && currentVerseWords.length > 0) {
-                    const finalizedWords = finalTranscript.toLowerCase().replace(/[^\w\s]/g, '').split(' ');
+                // --- Live, Real-time Highlighting ---
+                if (currentVerseWords.length > 0) {
+                    const liveWords = new Set(fullLiveTranscript.toLowerCase().replace(/[^\w\s]/g, '').split(' '));
 
-                    for (const spokenWord of finalizedWords) {
-                        if (!spokenWord) continue;
+                    // Reset highlights
+                    for(let i = 0; i < currentVerseWords.length; i++) {
+                        document.getElementById(`word-${i}`)?.classList.remove('word-spoken');
+                    }
 
-                        const nextExpectedWordIndex = lastSpokenWordIndex + 1;
-                        if (nextExpectedWordIndex < currentVerseWords.length) {
-                            const nextExpectedWord = currentVerseWords[nextExpectedWordIndex];
-                            if (spokenWord === nextExpectedWord) {
-                                lastSpokenWordIndex = nextExpectedWordIndex;
-                                document.getElementById(`word-${lastSpokenWordIndex}`)?.classList.add('word-spoken');
-                            }
+                    let spokenWordCount = 0;
+                    for (let i = 0; i < currentVerseWords.length; i++) {
+                        if (liveWords.has(currentVerseWords[i])) {
+                            document.getElementById(`word-${i}`)?.classList.add('word-spoken');
+                            spokenWordCount++;
                         }
                     }
-                }
 
-                // --- Smart Auto-Advance Check ---
-                if (currentVerseWords.length > 0) {
-                    const wordsRemaining = currentVerseWords.length - (lastSpokenWordIndex + 1);
+                    // --- Responsive Auto-Advance Check ---
+                    if (nextVerseTextForMatching) {
+                        const progressPercentage = (spokenWordCount / currentVerseWords.length) * 100;
 
-                    // Check for advance trigger only when within the last 5 words of the current verse
-                    if (nextVerseTextForMatching && wordsRemaining <= 5) {
-                        const nextVerseStartWords = nextVerseTextForMatching.toLowerCase().split(' ').slice(0, 3);
-                        const liveWords = new Set(fullLiveTranscript.toLowerCase().split(' ').slice(-10));
-                        let matchCount = 0;
-                        for (const word of nextVerseStartWords) {
-                            if (liveWords.has(word.replace(/[^\w\s]/gi, ''))) {
-                                matchCount++;
+                        // Start checking for the next verse when the speaker is >70% through the current one
+                        if (progressPercentage > 70) {
+                            const nextVerseStartWords = nextVerseTextForMatching.toLowerCase().split(' ').slice(0, 3);
+                            const recentLiveWords = new Set(fullLiveTranscript.toLowerCase().split(' ').slice(-10));
+                            let matchCount = 0;
+                            for (const word of nextVerseStartWords) {
+                                if (recentLiveWords.has(word.replace(/[^\w\s]/gi, ''))) {
+                                    matchCount++;
+                                }
                             }
-                        }
 
-                        if (nextVerseStartWords.length > 0 && matchCount >= 2) {
-                            if (isAutoAdvanceActive) {
-                                console.log(`Auto-advancing (words remaining: ${wordsRemaining})...`);
-                                nextVerse();
-                                nextVerseTextForMatching = '';
-                            } else {
-                                const nextBtn = document.getElementById('nextBtn');
-                                if (!nextBtn.classList.contains('flash-alert')) {
-                                    nextBtn.classList.add('flash-alert');
-                                    setTimeout(() => nextBtn.classList.remove('flash-alert'), 3000);
+                            if (nextVerseStartWords.length > 0 && matchCount >= 2) {
+                                if (isAutoAdvanceActive) {
+                                    console.log(`Auto-advancing (progress: ${progressPercentage.toFixed(0)}%)...`);
+                                    nextVerse();
+                                    nextVerseTextForMatching = ''; // Prevent immediate re-trigger
+                                } else {
+                                    const nextBtn = document.getElementById('nextBtn');
+                                    if (!nextBtn.classList.contains('flash-alert')) {
+                                        nextBtn.classList.add('flash-alert');
+                                        setTimeout(() => nextBtn.classList.remove('flash-alert'), 3000);
+                                    }
                                 }
                             }
                         }
