@@ -1790,6 +1790,26 @@
 
                 const currentTranscript = finalTranscript + interimTranscript;
                 document.getElementById('transcriptionText').textContent = currentTranscript;
+
+                // Check for auto-advance trigger using the real-time interim transcript for speed
+                if (isAutoAdvanceActive && nextVerseTextForMatching && interimTranscript) {
+                    const interimWords = new Set(interimTranscript.toLowerCase().split(' '));
+                    const nextVerseWords = nextVerseTextForMatching.toLowerCase().split(' ').slice(0, 3);
+
+                    let matchCount = 0;
+                    for (const word of nextVerseWords) {
+                        if (interimWords.has(word.replace(/[^\w\s]/gi, ''))) {
+                            matchCount++;
+                        }
+                    }
+
+                    // Require at least 2 of the first 3 words to match for an instant response
+                    if (nextVerseWords.length > 0 && matchCount >= 2) {
+                        console.log(`Auto-advancing to next verse (matched ${matchCount}/${nextVerseWords.length} words from interim transcript)...`);
+                        nextVerse();
+                        nextVerseTextForMatching = ''; // Clear after advancing
+                    }
+                }
                 
                 if (finalTranscript) {
                     recentTranscription += finalTranscript + ' ';
@@ -1804,26 +1824,6 @@
                     if (now - lastSuggestionUpdate > 2000) {
                         updateSuggestions();
                         lastSuggestionUpdate = now;
-                    }
-
-                    // Check for auto-advance trigger
-                    if (isAutoAdvanceActive && nextVerseTextForMatching) {
-                        const recentWords = new Set(recentTranscription.toLowerCase().split(' ').slice(-10));
-                        const nextVerseWords = nextVerseTextForMatching.toLowerCase().split(' ').slice(0, 3);
-
-                        let matchCount = 0;
-                        for (const word of nextVerseWords) {
-                            if (recentWords.has(word.replace(/[^\w\s]/gi, ''))) {
-                                matchCount++;
-                            }
-                        }
-
-                        // Require at least 2 of the first 3 words to match for higher speed
-                        if (nextVerseWords.length > 0 && matchCount >= 2) {
-                            console.log(`Auto-advancing to next verse (matched ${matchCount}/${nextVerseWords.length} words)...`);
-                            nextVerse();
-                            nextVerseTextForMatching = ''; // Clear after advancing
-                        }
                     }
                 }
             };
