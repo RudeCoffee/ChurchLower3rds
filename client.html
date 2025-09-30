@@ -1808,26 +1808,30 @@
                 let interimTranscript = '';
                 let finalTranscript = '';
 
+                // Consolidate transcript results
                 for (let i = event.resultIndex; i < event.results.length; i++) {
-                    const transcript = event.results[i][0].transcript;
+                    const transcriptPart = event.results[i][0].transcript;
                     if (event.results[i].isFinal) {
-                        finalTranscript += transcript;
+                        finalTranscript += transcriptPart;
                     } else {
-                        interimTranscript += transcript;
+                        interimTranscript = transcriptPart;
                     }
                 }
 
-                document.getElementById('transcriptionText').textContent = finalizedTranscriptForVerse + finalTranscript + interimTranscript;
+                // --- Unified Transcript Model ---
+                // 1. Update the permanent finalized transcript and the full text display
+                if (finalTranscript) {
+                    finalizedTranscriptForVerse += finalTranscript;
+                }
+                document.getElementById('transcriptionText').textContent = finalizedTranscriptForVerse + interimTranscript;
 
-                // --- Fault-Tolerant Verse Tracking ---
                 if (currentVerseWords.length > 0) {
-                    if (finalTranscript) {
-                        finalizedTranscriptForVerse += finalTranscript;
-                    }
+                    // 2. Create a single, unified transcript for matching
+                    const fullTranscriptForMatching = finalizedTranscriptForVerse + interimTranscript;
+                    const spokenWords = fullTranscriptForMatching.toLowerCase().replace(/[^\w\s]/g, '').split(' ').filter(w => w);
 
-                    const finalizedWords = finalizedTranscriptForVerse.toLowerCase().replace(/[^\w\s]/g, '').split(' ').filter(w => w);
+                    // 3. Run the fault-tolerant matching algorithm on the unified transcript
                     let lastMatchIndex = -1;
-
                     for (let i = 0; i < currentVerseWords.length; i++) {
                         document.getElementById(`word-${i}`)?.classList.remove('word-spoken');
                     }
@@ -1836,14 +1840,14 @@
                     let spokenWordPointer = 0;
                     const lookahead = 5;
 
-                    while (spokenWordPointer < finalizedWords.length && verseWordPointer < currentVerseWords.length) {
-                        if (finalizedWords[spokenWordPointer] === currentVerseWords[verseWordPointer]) {
+                    while (spokenWordPointer < spokenWords.length && verseWordPointer < currentVerseWords.length) {
+                        if (spokenWords[spokenWordPointer] === currentVerseWords[verseWordPointer]) {
                             verseWordPointer++;
                             spokenWordPointer++;
                         } else {
                             let resyncIndex = -1;
                             for (let i = 1; i <= lookahead && (verseWordPointer + i) < currentVerseWords.length; i++) {
-                                if (finalizedWords[spokenWordPointer] === currentVerseWords[verseWordPointer + i]) {
+                                if (spokenWords[spokenWordPointer] === currentVerseWords[verseWordPointer + i]) {
                                     resyncIndex = verseWordPointer + i;
                                     break;
                                 }
@@ -1862,19 +1866,10 @@
                          document.getElementById(`word-${i}`)?.classList.add('word-spoken');
                     }
 
-                    const interimWords = interimTranscript.toLowerCase().replace(/[^\w\s]/g, '').split(' ').filter(w => w);
-                    let tempVersePointer = lastMatchIndex + 1;
-                    for (const interimWord of interimWords) {
-                        if (tempVersePointer < currentVerseWords.length && interimWord === currentVerseWords[tempVersePointer]) {
-                            document.getElementById(`word-${tempVersePointer}`)?.classList.add('word-spoken');
-                            tempVersePointer++;
-                        }
-                    }
-
+                    // 4. Smart Auto-Advance Check (based on the unified, forward-moving progress)
                     if (nextVerseTextForMatching && lastMatchIndex === currentVerseWords.length - 1) {
                          const nextVerseStartWords = nextVerseTextForMatching.toLowerCase().split(' ').slice(0, 3);
-                         const allLiveWords = (finalTranscript + interimTranscript).toLowerCase().split(' ');
-                         const recentLiveWords = new Set(allLiveWords.slice(-5));
+                         const recentLiveWords = new Set(spokenWords.slice(-5));
                          let matchCount = 0;
                          for (const word of nextVerseStartWords) {
                              if (recentLiveWords.has(word.replace(/[^\w\s]/gi, ''))) {
@@ -1897,10 +1892,9 @@
                     }
                 }
 
-                // --- Efficient, Incremental Suggestion Update ---
+                // 5. Efficient, Incremental Suggestion Update
                 if (finalTranscript) {
-                    recentTranscription += finalTranscript; // Keep full history for scripture reference detection
-
+                    recentTranscription += finalTranscript;
                     const newWords = finalTranscript.toLowerCase().replace(/[^\w\s]/g, '').split(' ').filter(w => w);
 
                     for (const newWord of newWords) {
