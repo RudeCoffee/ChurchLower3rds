@@ -9,9 +9,9 @@
         }
        #bibleContainer.bible {
             position: absolute;
-            bottom: 20px;
-            left: 20px;
-            width: calc(100% - 40px);
+            bottom: 0;
+            left: 0;
+            width: 100%;
             display: flex;
             align-items: stretch; /* This makes the children the same height */
             box-sizing: border-box;
@@ -23,7 +23,7 @@
 
         #logoContainer {
             background-color: white;
-            border-radius: 15px 0 0 15px; /* Rounded corners on the left */
+            border-radius: 0; /* No rounded corners */
             padding: 10px;
             flex-shrink: 0;
             display: flex;
@@ -39,7 +39,7 @@
         #bibleTextContainer {
             background-color: #224269;
             padding: 20px;
-            border-radius: 0 15px 15px 0; /* Rounded corners on the right */
+            border-radius: 0; /* No rounded corners */
             display: flex;
             flex-direction: column;
             justify-content: center;
