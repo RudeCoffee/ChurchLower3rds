@@ -1816,51 +1816,75 @@
                     }
                 }
 
-                // Update the display with the full live transcript
                 document.getElementById('transcriptionText').textContent = finalizedTranscriptForVerse + finalTranscript + interimTranscript;
 
-                // --- Accurate Sequential Highlighting & Auto-Advance ---
                 if (currentVerseWords.length > 0) {
-                    // 1. Update the running finalized transcript
+                    // 1. Update running transcript
                     if (finalTranscript) {
                         finalizedTranscriptForVerse += finalTranscript;
                     }
 
-                    // 2. Perform sequential matching based on the finalized transcript
-                    const finalizedWords = finalizedTranscriptForVerse.toLowerCase().replace(/[^\w\s]/g, '').split(' ');
+                    // 2. Perform fault-tolerant matching on the finalized transcript
+                    const finalizedWords = finalizedTranscriptForVerse.toLowerCase().replace(/[^\w\s]/g, '').split(' ').filter(w => w);
                     let lastMatchIndex = -1;
 
-                    // Reset highlights before re-evaluating
-                    for(let i = 0; i < currentVerseWords.length; i++) {
+                    // Reset all highlights
+                    for (let i = 0; i < currentVerseWords.length; i++) {
                         document.getElementById(`word-${i}`)?.classList.remove('word-spoken');
                     }
 
                     let verseWordPointer = 0;
-                    for (const spokenWord of finalizedWords) {
-                        if (!spokenWord) continue;
-                        if (verseWordPointer < currentVerseWords.length && spokenWord === currentVerseWords[verseWordPointer]) {
-                            lastMatchIndex = verseWordPointer;
-                            document.getElementById(`word-${lastMatchIndex}`)?.classList.add('word-spoken');
+                    let spokenWordPointer = 0;
+                    const lookahead = 5; // How many words to look ahead in the verse for a match
+
+                    while (spokenWordPointer < finalizedWords.length && verseWordPointer < currentVerseWords.length) {
+                        if (finalizedWords[spokenWordPointer] === currentVerseWords[verseWordPointer]) {
+                            // Perfect match, advance both.
                             verseWordPointer++;
+                            spokenWordPointer++;
+                        } else {
+                            // Mismatch. Look for a resync point in the verse within the lookahead window.
+                            let resyncIndex = -1;
+                            for (let i = 1; i <= lookahead && (verseWordPointer + i) < currentVerseWords.length; i++) {
+                                if (finalizedWords[spokenWordPointer] === currentVerseWords[verseWordPointer + i]) {
+                                    resyncIndex = verseWordPointer + i;
+                                    break;
+                                }
+                            }
+
+                            if (resyncIndex !== -1) {
+                                // Resync found. Jump verse pointer.
+                                verseWordPointer = resyncIndex + 1;
+                                spokenWordPointer++;
+                            } else {
+                                // No resync found. Assume transcription error. Skip spoken word.
+                                spokenWordPointer++;
+                            }
                         }
                     }
 
-                    // 3. Use the live (interim) transcript for real-time highlighting beyond the last confirmed match
-                    const liveWords = (finalTranscript + interimTranscript).toLowerCase().replace(/[^\w\s]/g, '').split(' ');
-                    let liveVersePointer = lastMatchIndex + 1;
-                    for (const liveWord of liveWords) {
-                        if (!liveWord) continue;
-                        if (liveVersePointer < currentVerseWords.length && liveWord === currentVerseWords[liveVersePointer]) {
-                            document.getElementById(`word-${liveVersePointer}`)?.classList.add('word-spoken');
-                            liveVersePointer++;
+                    // Highlight based on the `verseWordPointer` which indicates how many words we've successfully matched.
+                    lastMatchIndex = verseWordPointer - 1;
+                    for (let i = 0; i <= lastMatchIndex; i++) {
+                         document.getElementById(`word-${i}`)?.classList.add('word-spoken');
+                    }
+
+
+                    // 3. Use live (interim) transcript for temporary highlighting
+                    const interimWords = interimTranscript.toLowerCase().replace(/[^\w\s]/g, '').split(' ').filter(w => w);
+                    let tempVersePointer = lastMatchIndex + 1;
+                    for (const interimWord of interimWords) {
+                        if (tempVersePointer < currentVerseWords.length && interimWord === currentVerseWords[tempVersePointer]) {
+                            document.getElementById(`word-${tempVersePointer}`)?.classList.add('word-spoken');
+                            tempVersePointer++;
                         }
                     }
 
-                    // 4. Smart Auto-Advance Check
-                    // Only check for the next verse when the speaker has completed the current one
+                    // 4. Smart Auto-Advance Check (based on the *finalized* match progress)
                     if (nextVerseTextForMatching && lastMatchIndex === currentVerseWords.length - 1) {
                          const nextVerseStartWords = nextVerseTextForMatching.toLowerCase().split(' ').slice(0, 3);
-                         const recentLiveWords = new Set(liveWords.slice(-10));
+                         const allLiveWords = (finalTranscript + interimTranscript).toLowerCase().split(' ');
+                         const recentLiveWords = new Set(allLiveWords.slice(-5));
                          let matchCount = 0;
                          for (const word of nextVerseStartWords) {
                              if (recentLiveWords.has(word.replace(/[^\w\s]/gi, ''))) {
@@ -1872,7 +1896,7 @@
                              if (isAutoAdvanceActive) {
                                  console.log(`Auto-advancing (verse complete)...`);
                                  nextVerse();
-                                 nextVerseTextForMatching = ''; // Prevent re-trigger
+                                 nextVerseTextForMatching = '';
                              } else {
                                  const nextBtn = document.getElementById('nextBtn');
                                  if (!nextBtn.classList.contains('flash-alert')) {
@@ -1884,7 +1908,7 @@
                     }
                 }
 
-                // --- Suggestion Update Processing (using finalized global transcript) ---
+                // 5. Suggestion Update Processing
                 if (finalTranscript) {
                     recentTranscription += finalTranscript + ' ';
                     const now = Date.now();
