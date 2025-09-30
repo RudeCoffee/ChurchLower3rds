@@ -1808,8 +1808,8 @@
 
                     // Check for auto-advance trigger
                     if (isAutoAdvanceActive && nextVerseTextForMatching) {
-                        const recentWords = new Set(recentTranscription.toLowerCase().split(' ').slice(-15));
-                        const nextVerseWords = nextVerseTextForMatching.toLowerCase().split(' ').slice(0, 5);
+                        const recentWords = new Set(recentTranscription.toLowerCase().split(' ').slice(-10));
+                        const nextVerseWords = nextVerseTextForMatching.toLowerCase().split(' ').slice(0, 3);
 
                         let matchCount = 0;
                         for (const word of nextVerseWords) {
@@ -1818,8 +1818,8 @@
                             }
                         }
 
-                        // Require at least 4 of the first 5 words to match for higher accuracy
-                        if (nextVerseWords.length > 0 && matchCount >= Math.min(4, nextVerseWords.length)) {
+                        // Require at least 2 of the first 3 words to match for higher speed
+                        if (nextVerseWords.length > 0 && matchCount >= 2) {
                             console.log(`Auto-advancing to next verse (matched ${matchCount}/${nextVerseWords.length} words)...`);
                             nextVerse();
                             nextVerseTextForMatching = ''; // Clear after advancing
