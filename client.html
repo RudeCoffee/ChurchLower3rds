@@ -83,10 +83,30 @@
         }
         .verse-navigation {
             display: grid;
-            grid-template-columns: 1fr auto auto auto 1fr;
+            grid-template-columns: 1fr auto auto auto auto 1fr;
             gap: 10px;
             margin-bottom: 15px;
             align-items: center;
+        }
+        .auto-advance-btn {
+            background-color: #6c757d;
+            color: white;
+            border: none;
+            padding: 8px 12px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 14px;
+        }
+        .auto-advance-btn.active {
+            background-color: var(--success-bg);
+        }
+        @keyframes flash {
+            0% { background-color: var(--button-bg); }
+            50% { background-color: var(--success-bg); transform: scale(1.05); }
+            100% { background-color: var(--button-bg); }
+        }
+        .flash-alert {
+            animation: flash 1s 3; /* Flash 3 times over 3 seconds */
         }
         .nav-button {
             background-color: var(--button-bg);
@@ -226,6 +246,12 @@
             line-height: 1.5;
             color: var(--text-color);
         }
+        .verse-text .word {
+            transition: background-color 0.3s, color 0.3s;
+        }
+        .verse-text .word-spoken {
+            color: yellow;
+        }
         .search-results {
             max-height: 300px;
             overflow-y: auto;
@@ -271,9 +297,13 @@
             transform: translateX(2px);
         }
         
-        .suggestion-item:first-child {
+        .suggestion-item.suggestion-direct-reference {
+            border-left: 4px solid var(--button-bg);
+            background: linear-gradient(90deg, var(--preview-bg) 20%, var(--container-bg) 20%);
+        }
+
+        .suggestion-item.suggestion-keyword-based {
             border-left: 4px solid var(--success-bg);
-            background: linear-gradient(90deg, var(--success-bg) 20%, var(--container-bg) 20%);
         }
         
         .suggestion-ref {
@@ -391,6 +421,7 @@
             <button class="nav-button" onclick="previousVerse()" id="prevBtn" disabled>← Previous</button>
             <span id="currentVerseRef" style="text-align: center; font-weight: bold;">Select a verse</span>
             <button class="nav-button" onclick="nextVerse()" id="nextBtn" disabled>Next →</button>
+            <button class="auto-advance-btn" id="autoAdvanceBtn" onclick="toggleAutoAdvance()" title="Automatically advance to the next verse when the speaker reads it.">Auto-Advance</button>
             <div></div>
         </div>
         
@@ -458,6 +489,13 @@
         let currentSpeakerIndex = -1;
         let currentBookData = null;
         let currentVerseData = null;
+        let isAutoAdvanceActive = false;
+        let nextVerseTextForMatching = '';
+        let isNavigatingFromSuggestion = false;
+        let lastHighlightedVerseIndex = -1;
+        let currentVerseWords = [];
+        let lastSpokenWordIndex = -1;
+        let finalizedTranscriptForVerse = '';
         
         // Additional variables for consistency
         let currentBook = '';
@@ -964,16 +1002,21 @@
                     // Request the verse preview
                     requestVersePreview(selectedBook, selectedChapter, verse);
                     
-                    // Clear the quick input and show success
-                    document.getElementById('quickVerseInput').value = '';
-                    if (status) {
-                        status.innerHTML = '✅ Verse found and selected!';
-                        status.style.color = '#28a745';
-                        setTimeout(() => {
-                            status.innerHTML = 'Format: BookName Chapter:Verse (e.g., "Genesis 1:16", "1 John 3:16", "Psalm 23:1")';
-                            status.style.color = 'var(--text-color)';
-                        }, 2000);
+                    // If navigating from a suggestion, don't clear the input. Otherwise, do.
+                    if (!isNavigatingFromSuggestion) {
+                        document.getElementById('quickVerseInput').value = '';
+                        if (status) {
+                            status.innerHTML = '✅ Verse found and selected!';
+                            status.style.color = '#28a745';
+                            setTimeout(() => {
+                                status.innerHTML = 'Format: BookName Chapter:Verse (e.g., "Genesis 1:16", "1 John 3:16", "Psalm 23:1")';
+                                status.style.color = 'var(--text-color)';
+                            }, 2000);
+                        }
                     }
+
+                    // Reset the flag after use
+                    isNavigatingFromSuggestion = false;
                 } else {
                     if (status) {
                         status.innerHTML = `❌ Verse ${verse} not found in ${selectedBook} ${selectedChapter}.`;
@@ -1240,10 +1283,17 @@
             
             // Store current verse data for display
             currentVerseData = verse;
+
+            // Reset highlighting and progress tracking for the new verse
+            lastHighlightedVerseIndex = -1;
+            lastSpokenWordIndex = -1;
+            finalizedTranscriptForVerse = '';
+            currentVerseWords = verse.text.toLowerCase().replace(/[^\w\s]/g, '').split(' ');
             
             // Update the preview display with clear formatting
             document.getElementById('verseReference').textContent = verseReference;
-            document.getElementById('verseText').textContent = verse.text;
+            const verseTextContainer = document.getElementById('verseText');
+            verseTextContainer.innerHTML = verse.text.split(' ').map((word, index) => `<span class="word" id="word-${index}">${word}</span>`).join(' ');
             document.getElementById('versePreview').style.display = 'block';
             document.getElementById('displayBtn').disabled = false;
             
@@ -1299,6 +1349,9 @@
                 verseReference = `${bookName} ${chapterNum}:${verseNum}`;
             }
             
+            // Store the next verse text for auto-advance matching
+            nextVerseTextForMatching = verse.text;
+
             // Update the next verse preview display
             document.getElementById('nextVerseReference').textContent = verseReference;
             document.getElementById('nextVerseText').textContent = verse.text;
@@ -1682,6 +1735,7 @@
         let isListening = false;
         let recentTranscription = '';
         let suggestionKeywords = new Map();
+        let keywordWindow = [];
         let lastSuggestionUpdate = 0;
         let suggestionHistory = []; // Track suggestions with timestamps
         let maxSuggestionHistory = 10; // Keep last 10 suggestions
@@ -1751,27 +1805,114 @@
                 let interimTranscript = '';
                 let finalTranscript = '';
 
+                // Consolidate transcript results
                 for (let i = event.resultIndex; i < event.results.length; i++) {
-                    const transcript = event.results[i][0].transcript;
+                    const transcriptPart = event.results[i][0].transcript;
                     if (event.results[i].isFinal) {
-                        finalTranscript += transcript;
+                        finalTranscript += transcriptPart;
                     } else {
-                        interimTranscript += transcript;
+                        interimTranscript = transcriptPart;
                     }
                 }
 
-                const currentTranscript = finalTranscript + interimTranscript;
-                document.getElementById('transcriptionText').textContent = currentTranscript;
-                
+                // --- Unified Transcript Model ---
+                // 1. Update the permanent finalized transcript and the full text display
                 if (finalTranscript) {
-                    recentTranscription += finalTranscript + ' ';
-                    // Keep only last 200 words to prevent memory issues
-                    const words = recentTranscription.split(' ');
-                    if (words.length > 200) {
-                        recentTranscription = words.slice(-200).join(' ');
+                    finalizedTranscriptForVerse += finalTranscript;
+                }
+                document.getElementById('transcriptionText').textContent = finalizedTranscriptForVerse + interimTranscript;
+
+                if (currentVerseWords.length > 0) {
+                    // 2. Create a single, unified transcript for matching
+                    const fullTranscriptForMatching = finalizedTranscriptForVerse + interimTranscript;
+                    const spokenWords = fullTranscriptForMatching.toLowerCase().replace(/[^\w\s]/g, '').split(' ').filter(w => w);
+
+                    // 3. Run the fault-tolerant matching algorithm on the unified transcript
+                    let lastMatchIndex = -1;
+                    for (let i = 0; i < currentVerseWords.length; i++) {
+                        document.getElementById(`word-${i}`)?.classList.remove('word-spoken');
                     }
-                    
-                    // Throttle suggestions to once every 2 seconds
+
+                    let verseWordPointer = 0;
+                    let spokenWordPointer = 0;
+                    const lookahead = 5;
+
+                    while (spokenWordPointer < spokenWords.length && verseWordPointer < currentVerseWords.length) {
+                        if (spokenWords[spokenWordPointer] === currentVerseWords[verseWordPointer]) {
+                            verseWordPointer++;
+                            spokenWordPointer++;
+                        } else {
+                            let resyncIndex = -1;
+                            for (let i = 1; i <= lookahead && (verseWordPointer + i) < currentVerseWords.length; i++) {
+                                if (spokenWords[spokenWordPointer] === currentVerseWords[verseWordPointer + i]) {
+                                    resyncIndex = verseWordPointer + i;
+                                    break;
+                                }
+                            }
+                            if (resyncIndex !== -1) {
+                                verseWordPointer = resyncIndex + 1;
+                                spokenWordPointer++;
+                            } else {
+                                spokenWordPointer++;
+                            }
+                        }
+                    }
+
+                    lastMatchIndex = verseWordPointer - 1;
+                    for (let i = 0; i <= lastMatchIndex; i++) {
+                         document.getElementById(`word-${i}`)?.classList.add('word-spoken');
+                    }
+
+                    // 4. Smart Auto-Advance Check (based on the unified, forward-moving progress)
+                    if (nextVerseTextForMatching && lastMatchIndex === currentVerseWords.length - 1) {
+                         const nextVerseStartWords = nextVerseTextForMatching.toLowerCase().split(' ').slice(0, 3);
+                         const recentLiveWords = new Set(spokenWords.slice(-5));
+                         let matchCount = 0;
+                         for (const word of nextVerseStartWords) {
+                             if (recentLiveWords.has(word.replace(/[^\w\s]/gi, ''))) {
+                                 matchCount++;
+                             }
+                         }
+                         if (nextVerseStartWords.length > 0 && matchCount >= 2) {
+                             if (isAutoAdvanceActive) {
+                                 console.log(`Auto-advancing (verse complete)...`);
+                                 nextVerse();
+                                 nextVerseTextForMatching = '';
+                             } else {
+                                 const nextBtn = document.getElementById('nextBtn');
+                                 if (!nextBtn.classList.contains('flash-alert')) {
+                                     nextBtn.classList.add('flash-alert');
+                                     setTimeout(() => nextBtn.classList.remove('flash-alert'), 3000);
+                                 }
+                             }
+                         }
+                    }
+                }
+
+                // 5. Efficient, Incremental Suggestion Update
+                if (finalTranscript) {
+                    recentTranscription += finalTranscript;
+                    const newWords = finalTranscript.toLowerCase().replace(/[^\w\s]/g, '').split(' ').filter(w => w);
+
+                    for (const newWord of newWords) {
+                        keywordWindow.push(newWord);
+                        if (biblicalKeywords[newWord]) {
+                            suggestionKeywords.set(newWord, (suggestionKeywords.get(newWord) || 0) + 1);
+                        }
+
+                        if (keywordWindow.length > 50) {
+                            const oldWord = keywordWindow.shift();
+                            if (biblicalKeywords[oldWord]) {
+                                const currentCount = suggestionKeywords.get(oldWord);
+                                if (currentCount > 1) {
+                                    suggestionKeywords.set(oldWord, currentCount - 1);
+                                } else {
+                                    suggestionKeywords.delete(oldWord);
+                                }
+                            }
+                        }
+                    }
+
                     const now = Date.now();
                     if (now - lastSuggestionUpdate > 2000) {
                         updateSuggestions();
@@ -1889,22 +2030,9 @@
         }
 
         function updateSuggestions() {
-            const text = recentTranscription.toLowerCase();
-            const words = text.split(/\s+/);
-            const recentWords = words.slice(-50); // Look at last 50 words
             const currentTime = Date.now();
             
-            // Count keyword occurrences
-            suggestionKeywords.clear();
-            
-            for (const word of recentWords) {
-                const cleanWord = word.replace(/[^\w]/g, ''); // Remove punctuation
-                if (biblicalKeywords[cleanWord]) {
-                    suggestionKeywords.set(cleanWord, (suggestionKeywords.get(cleanWord) || 0) + 1);
-                }
-            }
-
-            // Add keyword-based suggestions to history
+            // Add keyword-based suggestions to history (suggestionKeywords is now updated incrementally)
             for (const [keyword, count] of suggestionKeywords.entries()) {
                 const verses = biblicalKeywords[keyword];
                 if (!verses) continue;
@@ -2084,30 +2212,30 @@
 
                 if (suggestion.type === 'verse' || suggestion.type === 'chapter' || suggestion.type === 'book') {
                     // Direct Bible reference from speech
-                    suggestionDiv.style.border = '2px solid var(--button-bg)';
-                    suggestionDiv.style.background = 'var(--preview-bg)';
+                    suggestionDiv.classList.add('suggestion-direct-reference');
                     
                     if (suggestion.type === 'verse') {
                         suggestionDiv.onclick = () => navigateToVerse(`${suggestion.book} ${suggestion.chapter}:${suggestion.verse}`);
                         suggestionDiv.innerHTML = `
                             <div class="suggestion-ref">📖 ${suggestion.text}</div>
-                            <div class="suggestion-keywords">🎤 Verse mentioned <span class="timestamp">${timeText}</span> - click to navigate</div>
+                            <div class="suggestion-keywords">🎤 Verse mentioned <span class="timestamp">${timeText}</span> - click to display</div>
                         `;
                     } else if (suggestion.type === 'chapter') {
                         suggestionDiv.onclick = () => navigateToChapter(suggestion.book, suggestion.chapter);
                         suggestionDiv.innerHTML = `
                             <div class="suggestion-ref">📖 ${suggestion.text}</div>
-                            <div class="suggestion-keywords">🎤 Chapter mentioned <span class="timestamp">${timeText}</span> - click to browse</div>
+                            <div class="suggestion-keywords">🎤 Chapter mentioned <span class="timestamp">${timeText}</span> - click to display</div>
                         `;
                     } else {
                         suggestionDiv.onclick = () => navigateToBook(suggestion.book);
                         suggestionDiv.innerHTML = `
                             <div class="suggestion-ref">📖 ${suggestion.text}</div>
-                            <div class="suggestion-keywords">🎤 Book mentioned <span class="timestamp">${timeText}</span> - click to browse</div>
+                            <div class="suggestion-keywords">🎤 Book mentioned <span class="timestamp">${timeText}</span> - click to display</div>
                         `;
                     }
                 } else if (suggestion.type === 'keyword') {
                     // Keyword-based suggestion
+                    suggestionDiv.classList.add('suggestion-keyword-based');
                     suggestionDiv.onclick = () => navigateToVerse(suggestion.verse);
                     suggestionDiv.innerHTML = `
                         <div class="suggestion-ref">${suggestion.verse}</div>
@@ -2172,41 +2300,45 @@
             const chapter = parseInt(match[2]);
             const verse = parseInt(match[3]);
 
-            // Use the existing quick verse input functionality
+            // Set flag to indicate navigation is from a suggestion
+            isNavigatingFromSuggestion = true;
+
+            // Immediately display the verse on OBS for a fast user experience
+            requestVerse(bookName, chapter, verse);
+
+            // Use the existing quick verse input functionality to sync the UI
             const quickInput = document.getElementById('quickVerseInput');
             quickInput.value = verseRef;
             
-            // Trigger the selection
+            // Trigger the selection process to update the UI (dropdowns, preview, etc.)
             selectBookByName(bookName, chapter, verse);
             
             // Show feedback
             const status = document.getElementById('quickVerseStatus');
-            status.innerHTML = `📖 Navigating to ${verseRef} from sermon suggestion`;
+            status.innerHTML = `📖 Displaying ${verseRef} from suggestion...`;
             status.style.color = 'var(--button-bg)';
         }
 
         function navigateToChapter(bookName, chapter) {
-            // Navigate to a specific chapter (will show first verse)
-            const quickInput = document.getElementById('quickVerseInput');
-            quickInput.value = `${bookName} ${chapter}:1`;
-            
-            selectBookByName(bookName, chapter, 1);
-            
-            const status = document.getElementById('quickVerseStatus');
-            status.innerHTML = `📖 Navigating to ${bookName} ${chapter} from sermon`;
-            status.style.color = 'var(--button-bg)';
+            // Navigate to a specific chapter and display verse 1 immediately
+            navigateToVerse(`${bookName} ${chapter}:1`);
         }
 
         function navigateToBook(bookName) {
-            // Navigate to a book (will show chapter 1, verse 1)
-            const quickInput = document.getElementById('quickVerseInput');
-            quickInput.value = `${bookName} 1:1`;
-            
-            selectBookByName(bookName, 1, 1);
-            
-            const status = document.getElementById('quickVerseStatus');
-            status.innerHTML = `📖 Navigating to ${bookName} from sermon`;
-            status.style.color = 'var(--button-bg)';
+            // Navigate to a book and display chapter 1, verse 1 immediately
+            navigateToVerse(`${bookName} 1:1`);
+        }
+
+        function toggleAutoAdvance() {
+            isAutoAdvanceActive = !isAutoAdvanceActive;
+            const btn = document.getElementById('autoAdvanceBtn');
+            if (isAutoAdvanceActive) {
+                btn.classList.add('active');
+                btn.textContent = 'Auto-Advance: ON';
+            } else {
+                btn.classList.remove('active');
+                btn.textContent = 'Auto-Advance';
+            }
         }
 
         // Initialize speech recognition when page loads
