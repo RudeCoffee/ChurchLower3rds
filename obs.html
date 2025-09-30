@@ -13,7 +13,7 @@
             left: 20px;
             width: calc(100% - 40px);
             display: flex;
-            align-items: flex-end;
+            align-items: stretch; /* This makes the children the same height */
             box-sizing: border-box;
             color: white;
             font-family: Arial, sans-serif;
@@ -23,10 +23,11 @@
 
         #logoContainer {
             background-color: white;
-            border-radius: 15px;
+            border-radius: 15px 0 0 15px; /* Rounded corners on the left */
             padding: 10px;
-            margin-right: 20px;
             flex-shrink: 0;
+            display: flex;
+            align-items: flex-end; /* Aligns the logo to the bottom of this container */
         }
 
         #logo {
@@ -38,7 +39,7 @@
         #bibleTextContainer {
             background-color: #224269;
             padding: 20px;
-            border-radius: 15px;
+            border-radius: 0 15px 15px 0; /* Rounded corners on the right */
             display: flex;
             flex-direction: column;
             justify-content: center;
