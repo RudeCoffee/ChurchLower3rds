@@ -487,6 +487,7 @@
         let isAutoAdvanceActive = false;
         let nextVerseTextForMatching = '';
         let isNavigatingFromSuggestion = false;
+        let lastHighlightedVerseIndex = -1;
         
         // Additional variables for consistency
         let currentBook = '';
@@ -1274,6 +1275,9 @@
             
             // Store current verse data for display
             currentVerseData = verse;
+
+            // Reset highlighting for the new verse
+            lastHighlightedVerseIndex = -1;
             
             // Update the preview display with clear formatting
             document.getElementById('verseReference').textContent = verseReference;
@@ -1801,21 +1805,28 @@
                 const currentTranscript = finalTranscript + interimTranscript;
                 document.getElementById('transcriptionText').textContent = currentTranscript;
 
-                // --- Smart Auto-Advance and Progress Visualization ---
-
+                // --- Smart Auto-Advance and Progress Visualization with Sequential Matching ---
                 const verseWords = document.querySelectorAll('#verseText .word');
-                if (verseWords.length > 0) {
-                    const spokenWords = new Set(currentTranscript.toLowerCase().replace(/[^\w\s]/g, '').split(' '));
-                    let spokenWordCount = 0;
+                if (verseWords.length > 0 && interimTranscript) {
+                    const spokenWords = interimTranscript.toLowerCase().replace(/[^\w\s]/g, '').split(' ');
 
-                    verseWords.forEach(wordSpan => {
-                        const word = wordSpan.textContent.toLowerCase().replace(/[^\w\s]/g, '');
-                        if (word && spokenWords.has(word)) {
-                            wordSpan.classList.add('word-spoken');
-                            spokenWordCount++;
+                    for (const spokenWord of spokenWords) {
+                        if (!spokenWord) continue;
+
+                        // Start searching from the word after the last highlighted one
+                        for (let i = lastHighlightedVerseIndex + 1; i < verseWords.length; i++) {
+                            const verseWordSpan = verseWords[i];
+                            const verseWord = verseWordSpan.textContent.toLowerCase().replace(/[^\w\s]/g, '');
+
+                            if (verseWord === spokenWord) {
+                                verseWordSpan.classList.add('word-spoken');
+                                lastHighlightedVerseIndex = i;
+                                break; // Move to the next spoken word
+                            }
                         }
-                    });
+                    }
 
+                    const spokenWordCount = document.querySelectorAll('#verseText .word-spoken').length;
                     const progressPercentage = (spokenWordCount / verseWords.length) * 100;
 
                     // Only check for the next verse if we are over 70% through the current one
