@@ -1841,9 +1841,10 @@
 
                 // --- Smart Auto-Advance Check ---
                 if (currentVerseWords.length > 0) {
-                    const progressPercentage = ((lastSpokenWordIndex + 1) / currentVerseWords.length) * 100;
+                    const wordsRemaining = currentVerseWords.length - (lastSpokenWordIndex + 1);
 
-                    if (nextVerseTextForMatching && progressPercentage > 70) {
+                    // Check for advance trigger only when within the last 5 words of the current verse
+                    if (nextVerseTextForMatching && wordsRemaining <= 5) {
                         const nextVerseStartWords = nextVerseTextForMatching.toLowerCase().split(' ').slice(0, 3);
                         const liveWords = new Set(fullLiveTranscript.toLowerCase().split(' ').slice(-10));
                         let matchCount = 0;
@@ -1855,7 +1856,7 @@
 
                         if (nextVerseStartWords.length > 0 && matchCount >= 2) {
                             if (isAutoAdvanceActive) {
-                                console.log(`Auto-advancing (progress: ${progressPercentage.toFixed(0)}%)...`);
+                                console.log(`Auto-advancing (words remaining: ${wordsRemaining})...`);
                                 nextVerse();
                                 nextVerseTextForMatching = '';
                             } else {
