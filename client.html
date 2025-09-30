@@ -1817,23 +1817,19 @@
                 const fullLiveTranscript = finalTranscript + interimTranscript;
                 document.getElementById('transcriptionText').textContent = fullLiveTranscript;
 
-                // --- Live, Sequential Highlighting using Interim Transcript ---
-                if (interimTranscript && currentVerseWords.length > 0) {
-                    const spokenWords = interimTranscript.toLowerCase().replace(/[^\w\s]/g, '').split(' ');
+                // --- Accurate, Sequential Highlighting from Finalized Text ---
+                if (finalTranscript && currentVerseWords.length > 0) {
+                    const finalizedWords = finalTranscript.toLowerCase().replace(/[^\w\s]/g, '').split(' ');
 
-                    for (const spokenWord of spokenWords) {
+                    for (const spokenWord of finalizedWords) {
                         if (!spokenWord) continue;
 
-                        const searchStartIndex = lastSpokenWordIndex + 1;
-                        const searchEndIndex = Math.min(searchStartIndex + 5, currentVerseWords.length);
-
-                        for (let i = searchStartIndex; i < searchEndIndex; i++) {
-                            if (currentVerseWords[i] === spokenWord) {
-                                for (let j = lastSpokenWordIndex + 1; j <= i; j++) {
-                                    document.getElementById(`word-${j}`)?.classList.add('word-spoken');
-                                }
-                                lastSpokenWordIndex = i;
-                                break;
+                        const nextExpectedWordIndex = lastSpokenWordIndex + 1;
+                        if (nextExpectedWordIndex < currentVerseWords.length) {
+                            const nextExpectedWord = currentVerseWords[nextExpectedWordIndex];
+                            if (spokenWord === nextExpectedWord) {
+                                lastSpokenWordIndex = nextExpectedWordIndex;
+                                document.getElementById(`word-${lastSpokenWordIndex}`)?.classList.add('word-spoken');
                             }
                         }
                     }
@@ -1870,7 +1866,7 @@
                     }
                 }
 
-                // --- Final Transcript Processing for Suggestions ---
+                // --- Suggestion Update Processing ---
                 if (finalTranscript) {
                     recentTranscription += finalTranscript + ' ';
                     const now = Date.now();
