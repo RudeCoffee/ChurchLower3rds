@@ -421,6 +421,22 @@
         <button onclick="displaySpeaker()">Display Speaker</button>
         <button onclick="hideSpeaker()" class="hide">Hide Speaker</button>
     </div>
+
+    <div class="container">
+        <h2>Countdown Timer</h2>
+        <div class="form-group">
+            <label>Presets</label>
+            <button onclick="setCountdownPreset('09:45')">9:45 AM</button>
+            <button onclick="setCountdownPreset('11:15')">11:15 AM</button>
+            <button onclick="setCountdownPreset('18:15')">6:15 PM</button>
+        </div>
+        <div class="form-group">
+            <label for="customTime">Custom Time</label>
+            <input type="time" id="customTime" style="width: auto;">
+        </div>
+        <button onclick="startCustomCountdown()">Start Countdown</button>
+        <button onclick="stopCountdown()" class="hide">Stop Countdown</button>
+    </div>
     
     <div class="container">
         <h2>Text Search</h2>
@@ -2202,6 +2218,48 @@
         window.addEventListener('beforeunload', function() {
             stopTimestampUpdates();
         });
+
+        function setCountdownPreset(time) {
+            document.getElementById('customTime').value = time;
+            startCustomCountdown();
+        }
+
+        function startCustomCountdown() {
+            const timeInput = document.getElementById('customTime').value;
+            if (!timeInput) {
+                alert('Please select a time.');
+                return;
+            }
+
+            const [hours, minutes] = timeInput.split(':');
+            const targetTime = new Date();
+            targetTime.setHours(hours);
+            targetTime.setMinutes(minutes);
+            targetTime.setSeconds(0);
+            targetTime.setMilliseconds(0);
+
+            // If the time is in the past, set it for the next day
+            if (targetTime < new Date()) {
+                targetTime.setDate(targetTime.getDate() + 1);
+            }
+
+            if (ws && ws.readyState === WebSocket.OPEN) {
+                ws.send(JSON.stringify({
+                    type: 'countdown',
+                    targetTime: targetTime.getTime(),
+                    running: true
+                }));
+            }
+        }
+
+        function stopCountdown() {
+            if (ws && ws.readyState === WebSocket.OPEN) {
+                ws.send(JSON.stringify({
+                    type: 'countdown',
+                    running: false
+                }));
+            }
+        }
 
         // Connect on page load
         connect();

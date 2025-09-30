@@ -26,6 +26,11 @@ A real-time Bible verse and speaker name display system for OBS (Open Broadcaste
 - **Conflict Prevention** - Smart display logic prevents overlapping content
 - **Customizable List** - Easy speaker management via text file
 
+### ⏱️ Countdown Timer
+- **Live Countdown** - Display a real-time countdown for service starts or events
+- **"Starting Soon" Message** - Automatically shows a message when the timer finishes
+- **OBS Integration** - Works as a separate browser source in OBS
+
 ### 🎥 OBS Integration
 - **Browser Source Ready** - Direct integration with OBS Studio
 - **Fade Animations** - Smooth transitions for professional appearance
@@ -66,7 +71,8 @@ A real-time Bible verse and speaker name display system for OBS (Open Broadcaste
 
 4. **Access the interfaces**
    - **Control Interface**: http://localhost:8080/client.html
-   - **OBS Browser Source**: http://localhost:8080/obs.html
+   - **OBS Lower Thirds Source**: http://localhost:8080/obs.html
+   - **OBS Countdown Source**: http://localhost:8080/countdown.html
 
 ### OBS Setup
 
@@ -128,6 +134,7 @@ ChurchLower3rds/
 ├── main.go                 # Go server with WebSocket handling
 ├── client.html            # Control interface for operators
 ├── obs.html               # OBS browser source display
+├── countdown.html         # OBS browser source for countdown timer
 ├── kjv.json               # Complete KJV Bible database (31,000+ verses)
 ├── speakers.txt           # Customizable speaker names list
 ├── go.mod                 # Go module dependencies
