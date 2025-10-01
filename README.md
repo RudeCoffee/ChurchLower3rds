@@ -6,50 +6,52 @@ A real-time Bible verse and speaker name display system for OBS (Open Broadcaste
 ![Go Version](https://img.shields.io/badge/go-1.21+-blue.svg)
 ![Platform](https://img.shields.io/badge/platform-Windows%20%7C%20macOS%20%7C%20Linux-lightgrey.svg)
 
-
+**[Note: The screenshot below is outdated. Please replace it with the new `new_ui.png` screenshot.]**
 <img width="1986" height="1288" alt="image" src="https://github.com/user-attachments/assets/e8ce40da-fd31-430f-9324-0c65e2b1f6d6" />
 
 
 ## Features
 
+### 🎤 Live Sermon Scripture Suggestions
+- **Real-time Transcription**: Listens to the live sermon audio and transcribes it in real-time.
+- **Automatic Suggestions**: Intelligently suggests relevant Bible verses based on the spoken words.
+- **Keyword-Based and Direct References**: Detects both direct scripture mentions (e.g., "John 3:16") and keyword-based themes (e.g., "love," "faith").
+- **One-Click Display**: Click on a suggestion to instantly display the verse on the broadcast.
+
 ### 📖 Bible Verse Display
-- **Complete KJV Bible** - All 66 books with 31,000+ verses
-- **Smart Quick Input** - Type "Genesis 1:16" for instant verse selection
-- **Real-time Autocomplete** - Intelligent book name suggestions with validation
-- **Chapter Navigation** - Seamlessly browse through chapters and verses
-- **Live Preview** - See verse content before displaying on stream
-- **Next Verse Preview** - Preview upcoming verse for smooth transitions
+- **Complete KJV Bible**: All 66 books with 31,000+ verses.
+- **Smart Quick Input**: Type "Genesis 1:16" for instant verse selection.
+- **Real-time Autocomplete**: Intelligent book name suggestions with validation.
+- **Auto-Advance Toggle**: Automatically switch to the next verse when the speaker reads it.
+- **Live & Next Verse Preview**: See the current and upcoming verses before displaying them.
 
 ### 🎤 Speaker Management
-- **Speaker Names Display** - Professional lower third graphics for speaker identification
-- **Autocomplete System** - Quick speaker selection with predefined names
-- **Conflict Prevention** - Smart display logic prevents overlapping content
-- **Customizable List** - Easy speaker management via text file
+- **Speaker Names Display**: Professional lower third graphics for speaker identification.
+- **Autocomplete System**: Quick speaker selection with predefined names.
+- **Customizable List**: Easily manage the list of speakers in the `speakers.txt` file.
 
 ### ⏱️ Countdown Timer
-- **Live Countdown** - Display a real-time countdown for service starts or events
-- **"Starting Soon" Message** - Automatically shows a message when the timer finishes
-- **OBS Integration** - Works as a separate browser source in OBS
+- **Live Countdown**: Display a real-time countdown for service starts or events.
+- **"Starting Soon" Button**: Manually trigger a "Starting Soon" message at any time.
+- **Preset Times**: Quickly set the countdown to common service start times.
 
 ### 🎥 OBS Integration
-- **Browser Source Ready** - Direct integration with OBS Studio
-- **Fade Animations** - Smooth transitions for professional appearance
-- **Dynamic Sizing** - Automatically adjusts for long verses
-- **Bottom Positioning** - Non-intrusive placement for broadcast overlay
-- **Real-time Updates** - Instant synchronization between control and display
+- **Browser Source Ready**: Direct integration with OBS Studio.
+- **Fade Animations**: Smooth transitions for a professional appearance.
+- **Dynamic Sizing**: Automatically adjusts for long verses.
 
 ### 🎨 User Interface
-- **Dark/Light Themes** - Toggle between visual modes
-- **Responsive Design** - Works on desktop and tablet devices
-- **Keyboard Shortcuts** - Efficient navigation with arrow keys and Enter
-- **Visual Feedback** - Color-coded status indicators and validation
+- **Dark/Light Themes**: Toggle between visual modes for comfort.
+- **Responsive Design**: Works on desktop and tablet devices.
+- **Cleaner Layout**: A redesigned interface places key controls side-by-side for easier access.
+- **Keyboard Shortcuts**: Efficient navigation with arrow keys and Enter.
 
 ## Quick Start
 
 ### Prerequisites
 - [Go 1.21+](https://golang.org/dl/) installed on your system
 - [OBS Studio](https://obsproject.com/) for broadcasting
-- Modern web browser (Chrome, Firefox, Edge, Safari)
+- A modern web browser that supports the Web Speech API (Chrome, Edge) for the sermon suggestion feature.
 
 ### Installation
 
@@ -74,205 +76,37 @@ A real-time Bible verse and speaker name display system for OBS (Open Broadcaste
    - **OBS Lower Thirds Source**: http://localhost:8080/obs.html
    - **OBS Countdown Source**: http://localhost:8080/countdown.html
 
-### OBS Setup
-
-1. **Add Browser Source**
-   - In OBS, add a new "Browser" source
-   - Set URL to: `http://localhost:8080/obs.html`
-   - Recommended size: 1920x1080 (or your stream resolution)
-   - Check "Shutdown source when not visible" for performance
-
-2. **Position the Source**
-   - Place the browser source above your main video feed
-   - The lower thirds will appear at the bottom of the screen automatically
-
 ## Usage Guide
 
+### Live Sermon Suggestions
+1.  Click the **"🎤 Start Listening"** button. Your browser will ask for microphone permission.
+2.  As the sermon is preached, the system will transcribe the audio and display relevant scripture suggestions.
+3.  Click on any suggestion to instantly preview it and display it on the OBS output.
+
 ### Quick Verse Selection
+- **Smart Input**: Type a reference like `Genesis 1:16` and press Enter.
+- **Auto-Advance**: Enable the "Auto-Advance" toggle switch. The system will listen to the sermon audio and automatically advance to the next verse when it detects that the current verse has been read.
+- **Traditional Dropdowns**: Use the Book, Chapter, and Verse dropdowns for manual selection.
 
-The fastest way to display a Bible verse:
-
-1. **Smart Input Method**
-   ```
-   Type: Genesis 1:16
-   Press: Enter
-   ```
-   - Real-time validation prevents errors
-   - Autocomplete suggests book names
-   - Instant verse lookup and display
-
-2. **Traditional Dropdown Method**
-   - Select Book → Chapter → Verse
-   - Use arrow keys for quick navigation
-   - Preview appears automatically
-
-### Speaker Display
-
-1. **Add Speaker Names**
-   - Edit `speakers.txt` file
-   - Add one speaker name per line
-   - Restart server to load new names
-
-2. **Display Speaker**
-   - Type speaker name (autocomplete enabled)
-   - Click "Show Speaker" to display on stream
-   - Click "Hide Speaker" to remove from display
-
-### Navigation Controls
-
-- **Previous/Next Verse**: Navigate through verses with buttons
-- **Chapter Boundaries**: Automatically transitions between chapters
-- **Keyboard Shortcuts**:
-  - `Enter`: Select highlighted option
-  - `Arrow Keys`: Navigate dropdown menus
-  - `Escape`: Close dropdown menus
+### Countdown Timer
+- **Set a Time**: Use one of the preset buttons or enter a custom time.
+- **Start Countdown**: Click "Start Countdown" to begin the timer on the OBS output.
+- **Starting Soon**: Click the "Starting Soon" button to immediately display the "Starting soon" message, overriding the timer.
 
 ## File Structure
-
 ```
 ChurchLower3rds/
 ├── main.go                 # Go server with WebSocket handling
 ├── client.html            # Control interface for operators
 ├── obs.html               # OBS browser source display
 ├── countdown.html         # OBS browser source for countdown timer
-├── kjv.json               # Complete KJV Bible database (31,000+ verses)
+├── kjv.json               # Complete KJV Bible database
 ├── speakers.txt           # Customizable speaker names list
-├── go.mod                 # Go module dependencies
-├── go.sum                 # Dependency checksums
-└── README.md              # This documentation
-```
-
-## Configuration
-
-### Speaker Names
-Edit `speakers.txt` to customize available speakers:
-```
-Pastor John Smith
-Elder Mary Johnson
-Guest Speaker Mike Wilson
-Worship Leader Sarah Davis
-```
-
-### Display Styling
-Customize the appearance by editing CSS in `obs.html`:
-- Font sizes, colors, and positioning
-- Background opacity and border radius
-- Animation timing and effects
-
-## Technical Details
-
-### Architecture
-- **Backend**: Go with Gorilla WebSocket for real-time communication
-- **Frontend**: Vanilla HTML/CSS/JavaScript with WebSocket client
-- **Data**: JSON-based Bible database with nested book/chapter/verse structure
-- **Communication**: WebSocket messages for instant synchronization
-
-### WebSocket Messages
-The system uses these message types:
-- `get_books`, `get_chapters`, `get_verses` - Data retrieval
-- `preview_verse`, `get_verse` - Verse display commands
-- `get_speakers` - Speaker list retrieval
-- `show_speaker`, `hide_speaker` - Speaker display control
-
-### Performance
-- **Memory Usage**: ~50MB with full KJV Bible loaded
-- **Response Time**: <10ms for verse lookups
-- **Concurrent Users**: Supports multiple control interfaces
-- **Browser Compatibility**: Modern browsers with WebSocket support
-
-## Troubleshooting
-
-### Common Issues
-
-**Server won't start**
-- Check if port 8080 is already in use
-- Ensure Go is properly installed (`go version`)
-- Verify all dependencies are installed (`go mod download`)
-
-**OBS shows blank screen**
-- Confirm the server is running
-- Check the browser source URL: `http://localhost:8080/obs.html`
-- Refresh the browser source in OBS
-- Check browser console for JavaScript errors
-
-**Verses not displaying**
-- Verify `kjv.json` file is present and valid
-- Check server console for loading errors
-- Ensure WebSocket connection is established
-
-**Autocomplete not working**
-- Refresh the control interface
-- Check network connectivity to server
-- Verify JavaScript is enabled in browser
-
-### Debug Mode
-Add logging to troubleshoot issues:
-```bash
-go run main.go -verbose  # (if implemented)
+└── ...
 ```
 
 ## Contributing
-
-We welcome contributions! Please follow these steps:
-
-1. **Fork the repository**
-2. **Create a feature branch**
-   ```bash
-   git checkout -b feature/amazing-feature
-   ```
-3. **Make your changes**
-   - Follow Go best practices
-   - Test thoroughly with OBS
-   - Update documentation if needed
-4. **Commit your changes**
-   ```bash
-   git commit -m "Add amazing feature"
-   ```
-5. **Push to your branch**
-   ```bash
-   git push origin feature/amazing-feature
-   ```
-6. **Open a Pull Request**
-
-### Development Guidelines
-- Use `gofmt` for Go code formatting
-- Test with multiple browsers for frontend changes
-- Ensure WebSocket messages maintain backward compatibility
-- Update README for new features
+Contributions are welcome! Please fork the repository, create a feature branch, and open a pull request.
 
 ## License
-
-This project is licensed under the MIT License - see the [LICENSES.md](LICENSES.md) file for details.
-
-## Changelog
-
-### Version 2.0.0 (Latest)
-- ✨ Added smart quick verse input with autocomplete
-- ✨ Real-time input validation and error prevention
-- ✨ Dynamic background height adjustment for long verses
-- ✨ Improved fade animations and visual feedback
-- ✨ Enhanced keyboard navigation and shortcuts
-- 🐛 Fixed chapter boundary navigation
-- 🐛 Resolved speaker/verse display conflicts
-
-### Version 1.0.0
-- 📖 Complete KJV Bible integration
-- 🎤 Speaker name display system
-- 🎥 OBS browser source compatibility
-- 🌓 Dark/light theme support
-- ⚡ Real-time WebSocket communication
-
-## Support
-
-- **Issues**: [GitHub Issues](https://github.com/RudeCoffee/ChurchLower3rds/issues)
-- **Documentation**: This README and inline code comments
-
-## Acknowledgments
-
-- King James Version Bible text (Public Domain)
-- [Gorilla WebSocket](https://github.com/gorilla/websocket) for Go WebSocket implementation
-- OBS Studio community for browser source capabilities
-
----
-
-**Built with ❤️ for churches and ministries worldwide**
+This project is licensed under the MIT License. See the [LICENSES.md](LICENSES.md) file for details.
