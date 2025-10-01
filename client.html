@@ -49,7 +49,10 @@
             border-radius: 8px;
             box-shadow: 0 2px 4px rgba(0,0,0,0.3);
             margin-bottom: 20px;
-            transition: background-color 0.3s;
+            transition: background-color 0.3s, transform 0.2s;
+        }
+        .container:hover {
+            transform: translateY(-2px);
         }
         h1, h2 {
             color: var(--text-color);
@@ -100,6 +103,48 @@
         .auto-advance-btn.active {
             background-color: var(--success-bg);
         }
+
+        .auto-advance-switch {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        .auto-advance-switch input {
+            display: none;
+        }
+        .auto-advance-switch .slider {
+            position: relative;
+            width: 40px;
+            height: 20px;
+            background-color: #6c757d;
+            border-radius: 10px;
+            cursor: pointer;
+            transition: background-color 0.2s;
+        }
+        .auto-advance-switch .slider::before {
+            content: "";
+            position: absolute;
+            width: 16px;
+            height: 16px;
+            border-radius: 50%;
+            background-color: white;
+            top: 2px;
+            left: 2px;
+            transition: transform 0.2s;
+        }
+        .auto-advance-switch input:checked + .slider {
+            background-color: var(--success-bg);
+        }
+        .auto-advance-switch input:checked + .slider::before {
+            transform: translateX(20px);
+        }
+
+        .side-by-side-container {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 20px;
+        }
+
         @keyframes flash {
             0% { background-color: var(--button-bg); }
             50% { background-color: var(--success-bg); transform: scale(1.05); }
@@ -421,7 +466,11 @@
             <button class="nav-button" onclick="previousVerse()" id="prevBtn" disabled>← Previous</button>
             <span id="currentVerseRef" style="text-align: center; font-weight: bold;">Select a verse</span>
             <button class="nav-button" onclick="nextVerse()" id="nextBtn" disabled>Next →</button>
-            <button class="auto-advance-btn" id="autoAdvanceBtn" onclick="toggleAutoAdvance()" title="Automatically advance to the next verse when the speaker reads it.">Auto-Advance</button>
+            <div class="auto-advance-switch">
+                <input type="checkbox" id="autoAdvanceSwitch" onchange="toggleAutoAdvance()">
+                <label for="autoAdvanceSwitch" class="slider"></label>
+                <span>Auto-Advance</span>
+            </div>
             <div></div>
         </div>
         
@@ -439,34 +488,37 @@
         <button onclick="displayVerse()" id="displayBtn" disabled>Display Verse</button>
         <button onclick="hideVerse()" class="hide">Hide Verse</button>
     </div>
-    
-    <div class="container">
-        <h2>Speaker Name</h2>
-        <div class="form-group">
-            <label for="speakerInput">Speaker Name</label>
-            <div class="autocomplete-container">
-                <input type="text" id="speakerInput" placeholder="Enter speaker name" oninput="filterSpeakers()" onkeydown="handleSpeakerKeydown(event)">
-                <div class="autocomplete-dropdown" id="speakerDropdown"></div>
-            </div>
-        </div>
-        <button onclick="displaySpeaker()">Display Speaker</button>
-        <button onclick="hideSpeaker()" class="hide">Hide Speaker</button>
-    </div>
 
-    <div class="container">
-        <h2>Countdown Timer</h2>
-        <div class="form-group">
-            <label>Presets</label>
-            <button onclick="setCountdownPreset('09:45')">9:45 AM</button>
-            <button onclick="setCountdownPreset('11:15')">11:15 AM</button>
-            <button onclick="setCountdownPreset('18:15')">6:15 PM</button>
+    <div class="side-by-side-container">
+        <div class="container">
+            <h2>Speaker Name</h2>
+            <div class="form-group">
+                <label for="speakerInput">Speaker Name</label>
+                <div class="autocomplete-container">
+                    <input type="text" id="speakerInput" placeholder="Enter speaker name" oninput="filterSpeakers()" onkeydown="handleSpeakerKeydown(event)">
+                    <div class="autocomplete-dropdown" id="speakerDropdown"></div>
+                </div>
+            </div>
+            <button onclick="displaySpeaker()">Display Speaker</button>
+            <button onclick="hideSpeaker()" class="hide">Hide Speaker</button>
         </div>
-        <div class="form-group">
-            <label for="customTime">Custom Time</label>
-            <input type="time" id="customTime" style="width: auto;">
+
+        <div class="container">
+            <h2>Countdown Timer</h2>
+            <div class="form-group">
+                <label>Presets</label>
+                <button onclick="setCountdownPreset('09:45')">9:45 AM</button>
+                <button onclick="setCountdownPreset('11:15')">11:15 AM</button>
+                <button onclick="setCountdownPreset('18:15')">6:15 PM</button>
+            </div>
+            <div class="form-group">
+                <label for="customTime">Custom Time</label>
+                <input type="time" id="customTime" style="width: auto;">
+            </div>
+            <button onclick="startCustomCountdown()">Start Countdown</button>
+            <button onclick="showStartingSoon()">Starting Soon</button>
+            <button onclick="stopCountdown()" class="hide">Stop Countdown</button>
         </div>
-        <button onclick="startCustomCountdown()">Start Countdown</button>
-        <button onclick="stopCountdown()" class="hide">Stop Countdown</button>
     </div>
     
     <div class="container">
@@ -581,6 +633,15 @@
                     book: selectedBook,
                     chapter: selectedChapter,
                     verse: selectedVerse
+                }));
+            }
+        }
+
+        function showStartingSoon() {
+            if (ws && ws.readyState === WebSocket.OPEN) {
+                ws.send(JSON.stringify({
+                    type: 'countdown',
+                    startingSoon: true
                 }));
             }
         }
@@ -2330,15 +2391,8 @@
         }
 
         function toggleAutoAdvance() {
-            isAutoAdvanceActive = !isAutoAdvanceActive;
-            const btn = document.getElementById('autoAdvanceBtn');
-            if (isAutoAdvanceActive) {
-                btn.classList.add('active');
-                btn.textContent = 'Auto-Advance: ON';
-            } else {
-                btn.classList.remove('active');
-                btn.textContent = 'Auto-Advance';
-            }
+            const checkbox = document.getElementById('autoAdvanceSwitch');
+            isAutoAdvanceActive = checkbox.checked;
         }
 
         // Initialize speech recognition when page loads

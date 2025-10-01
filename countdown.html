@@ -58,6 +58,13 @@
                 const countdownText = document.getElementById('countdown-text');
                 const startingSoon = document.getElementById('starting-soon');
 
+                if (data.startingSoon) {
+                    clearInterval(countdownInterval);
+                    countdownText.style.display = 'none';
+                    startingSoon.style.display = 'block';
+                    return;
+                }
+
                 if (data.running) {
                     clearInterval(countdownInterval);
 
