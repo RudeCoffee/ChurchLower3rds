@@ -516,6 +516,7 @@
                 <input type="time" id="customTime" style="width: auto;">
             </div>
             <button onclick="startCustomCountdown()">Start Countdown</button>
+            <button onclick="showStartingSoon()">Starting Soon</button>
             <button onclick="stopCountdown()" class="hide">Stop Countdown</button>
         </div>
     </div>
@@ -632,6 +633,15 @@
                     book: selectedBook,
                     chapter: selectedChapter,
                     verse: selectedVerse
+                }));
+            }
+        }
+
+        function showStartingSoon() {
+            if (ws && ws.readyState === WebSocket.OPEN) {
+                ws.send(JSON.stringify({
+                    type: 'countdown',
+                    startingSoon: true
                 }));
             }
         }

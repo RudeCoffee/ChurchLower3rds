@@ -28,9 +28,10 @@ type Message struct {
 }
 
 type CountdownMessage struct {
-	Type       string `json:"type"`
-	TargetTime int64  `json:"targetTime,omitempty"`
-	Running    bool   `json:"running"`
+	Type         string `json:"type"`
+	TargetTime   int64  `json:"targetTime,omitempty"`
+	Running      bool   `json:"running"`
+	StartingSoon bool   `json:"startingSoon,omitempty"`
 }
 
 type BibleData struct {
