@@ -1,7 +1,6 @@
 <!DOCTYPE html>
 
 <head>
-
     <style>
         body {
             margin: 0;
@@ -115,8 +114,6 @@
             transform: translateY(0) !important;
         }
     </style>
-
-
 </head>
 
 <body>
@@ -133,73 +130,92 @@
     <div id="speakerContainer" class="speaker">
         <div id="speakerLogoContainer">
             <img id="speakerLogo" src="logoTransparent.png" alt="Logo">
+        </div>
+        <div id="speakerTextContainer">
+            <div id="speakerName"></div>
+        </div>
+    </div>
 
-            if (data.show) {
-            // Hide speaker first if it's visible
-            if (document.querySelector('.speaker.visible')) {
-            speakerElements.forEach(el => el.classList.remove('visible'));
-            setTimeout(() => {
-            document.getElementById('speakerText').textContent = '';
-            }, 1000);
-            }
+    <script>
+        // Connect to WebSocket
+        const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+        const host = window.location.hostname;
+        const port = '8080';
+        const ws = new WebSocket(`${protocol}//${host}:${port}/ws/obs`);
 
-            // Set text content first
-            document.getElementById('bibleBook').textContent = data.book || '';
-            document.getElementById('bibleVerse').textContent = data.verse || '';
+        ws.onmessage = function (event) {
+            const data = JSON.parse(event.data);
 
-            // Show bible verse
-            setTimeout(() => {
-            bibleElements.forEach(el => el.classList.add('visible'));
-            }, 10);
-            } else {
-            // Start fade out first
-            bibleElements.forEach(el => el.classList.remove('visible'));
-            // Clear text after fade animation completes (1 second)
-            setTimeout(() => {
-            document.getElementById('bibleBook').textContent = '';
-            document.getElementById('bibleVerse').textContent = '';
-            }, 1000);
-            }
+            if (data.type === 'bible') {
+                const speakerElements = document.querySelectorAll('.speaker');
+                const bibleElements = document.querySelectorAll('.bible');
+
+                if (data.show) {
+                    // Hide speaker first if it's visible
+                    if (document.querySelector('.speaker.visible')) {
+                        speakerElements.forEach(el => el.classList.remove('visible'));
+                        setTimeout(() => {
+                            document.getElementById('speakerName').textContent = '';
+                        }, 1000);
+                    }
+
+                    // Set text content first
+                    document.getElementById('bibleBook').textContent = data.book || '';
+                    document.getElementById('bibleVerse').textContent = data.verse || '';
+
+                    // Show bible verse
+                    setTimeout(() => {
+                        bibleElements.forEach(el => el.classList.add('visible'));
+                    }, 10);
+                } else {
+                    // Start fade out first
+                    bibleElements.forEach(el => el.classList.remove('visible'));
+                    // Clear text after fade animation completes (1 second)
+                    setTimeout(() => {
+                        document.getElementById('bibleBook').textContent = '';
+                        document.getElementById('bibleVerse').textContent = '';
+                    }, 1000);
+                }
             } else if (data.type === 'speaker') {
-            const speakerElements = document.querySelectorAll('.speaker');
-            const bibleElements = document.querySelectorAll('.bible');
+                const speakerElements = document.querySelectorAll('.speaker');
+                const bibleElements = document.querySelectorAll('.bible');
 
-            if (data.show) {
-            // Hide bible verse first if it's visible
-            if (document.querySelector('.bible.visible')) {
-            bibleElements.forEach(el => el.classList.remove('visible'));
-            setTimeout(() => {
-            document.getElementById('bibleBook').textContent = '';
-            document.getElementById('bibleVerse').textContent = '';
-            }, 1000);
-            }
+                if (data.show) {
+                    // Hide bible verse first if it's visible
+                    if (document.querySelector('.bible.visible')) {
+                        bibleElements.forEach(el => el.classList.remove('visible'));
+                        setTimeout(() => {
+                            document.getElementById('bibleBook').textContent = '';
+                            document.getElementById('bibleVerse').textContent = '';
+                        }, 1000);
+                    }
 
-            // Set text content first, then show speaker
-            document.getElementById('speakerName').textContent = data.speaker || '';
-            speakerElements.forEach(el => el.classList.add('visible'));
-            } else {
-            // Start fade out first
-            speakerElements.forEach(el => el.classList.remove('visible'));
-            // Clear text after fade animation completes (1 second)
-            setTimeout(() => {
-            document.getElementById('speakerName').textContent = '';
-            }, 1000);
+                    // Set text content first, then show speaker
+                    document.getElementById('speakerName').textContent = data.speaker || '';
+                    speakerElements.forEach(el => el.classList.add('visible'));
+                } else {
+                    // Start fade out first
+                    speakerElements.forEach(el => el.classList.remove('visible'));
+                    // Clear text after fade animation completes (1 second)
+                    setTimeout(() => {
+                        document.getElementById('speakerName').textContent = '';
+                    }, 1000);
+                }
             }
-            }
-            };
+        };
 
-            ws.onopen = function() {
+        ws.onopen = function () {
             console.log('Connected to server');
-            };
+        };
 
-            ws.onclose = function() {
+        ws.onclose = function () {
             console.log('Disconnected from server');
             // Attempt to reconnect after 3 seconds
             setTimeout(() => {
-            location.reload();
+                location.reload();
             }, 3000);
-            };
-            </script>
+        };
+    </script>
 </body>
 
 </html>
