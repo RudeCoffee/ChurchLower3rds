@@ -795,7 +795,10 @@
         }
 
         function connect() {
-            ws = new WebSocket('ws://localhost:8080/ws/control');
+            const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+            const host = window.location.hostname;
+            const port = '8080'; // Hardcoded port since server runs on 8080
+            ws = new WebSocket(`${protocol}//${host}:${port}/ws/control`);
             
             ws.onopen = function() {
                 console.log('Connected to server');

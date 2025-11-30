@@ -1,5 +1,6 @@
 <!DOCTYPE html>
 <html>
+
 <head>
     <style>
         body {
@@ -10,6 +11,7 @@
             color: white;
             text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.7);
         }
+
         .container {
             position: absolute;
             top: 50%;
@@ -17,10 +19,12 @@
             transform: translate(-50%, -50%);
             text-align: center;
         }
+
         #countdown-text {
             font-size: 150px;
             font-weight: bold;
         }
+
         #starting-soon {
             font-size: 80px;
             font-weight: bold;
@@ -28,6 +32,7 @@
         }
     </style>
 </head>
+
 <body>
     <div class="container">
         <div id="countdown-text"></div>
@@ -35,13 +40,16 @@
     </div>
 
     <script>
-        const ws = new WebSocket('ws://localhost:8080/ws/obs');
+        const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+        const host = window.location.hostname;
+        const port = '8080';
+        const ws = new WebSocket(`${protocol}//${host}:${port}/ws/obs`);
 
-        ws.onopen = function() {
+        ws.onopen = function () {
             console.log('Connected to server');
         };
 
-        ws.onclose = function() {
+        ws.onclose = function () {
             console.log('Disconnected from server');
             // Attempt to reconnect after 3 seconds
             setTimeout(() => {
@@ -51,7 +59,7 @@
 
         let countdownInterval;
 
-        ws.onmessage = function(event) {
+        ws.onmessage = function (event) {
             const data = JSON.parse(event.data);
 
             if (data.type === 'countdown') {
@@ -97,4 +105,5 @@
         };
     </script>
 </body>
+
 </html>

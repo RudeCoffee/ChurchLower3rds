@@ -1,10 +1,10 @@
 package main
 
-import (
 	"encoding/json"
 	"fmt"
 	"io/ioutil"
 	"log"
+	"net"
 	"net/http"
 	"strconv"
 	"strings"
@@ -635,9 +635,25 @@ func main() {
 	http.HandleFunc("/ws/obs", handleOBSWebSocket)
 	http.HandleFunc("/ws/control", handleControlWebSocket)
 
+	ip := getOutboundIP()
 	fmt.Println("Server starting on :8080")
+	fmt.Printf("Local URL: http://localhost:8080/client.html\n")
+	if ip != "" {
+		fmt.Printf("Network URL: http://%s:8080/client.html\n", ip)
+	}
 	fmt.Println("OBS Browser Source URL: http://localhost:8080/obs.html")
-	fmt.Println("Control Interface URL: http://localhost:8080/client.html")
 
 	log.Fatal(http.ListenAndServe(":8080", nil))
+}
+
+func getOutboundIP() string {
+	conn, err := net.Dial("udp", "8.8.8.8:80")
+	if err != nil {
+		return ""
+	}
+	defer conn.Close()
+
+	localAddr := conn.LocalAddr().(*net.UDPAddr)
+
+	return localAddr.IP.String()
 }
