@@ -3,9 +3,9 @@ package main
 import (
 	"encoding/json"
 	"fmt"
-	"io/ioutil"
 	"log"
 	"net"
+	"os"
 	"net/http"
 	"strconv"
 	"strings"
@@ -85,14 +85,34 @@ type VersesResponse struct {
 	Verses  []int  `json:"verses"`
 }
 
-var obsClients []*websocket.Conn
+// Client wraps a websocket connection with a mutex for thread-safe writing
+type Client struct {
+	conn *websocket.Conn
+	mu   sync.Mutex
+}
+
+func (c *Client) WriteJSON(v interface{}) error {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	return c.conn.WriteJSON(v)
+}
+
+func (c *Client) WriteMessage(messageType int, data []byte) error {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	return c.conn.WriteMessage(messageType, data)
+}
+
+var obsClients []*Client
 var obsClientsMutex sync.Mutex
-var controlClients []*websocket.Conn
+var controlClients []*Client
+var controlClientsMutex sync.Mutex
 var bibleData BibleData
 var speakers []string
+var aiClient *AIClient
 
 func loadSpeakers() {
-	data, err := ioutil.ReadFile("speakers.txt")
+	data, err := os.ReadFile("speakers.txt")
 	if err != nil {
 		log.Printf("Warning: Could not load speakers.txt: %v", err)
 		log.Println("Speaker autocomplete will not be available")
@@ -120,7 +140,7 @@ func loadSpeakers() {
 }
 
 func loadBibleData() {
-	data, err := ioutil.ReadFile("kjv.json")
+	data, err := os.ReadFile("kjv.json")
 	if err != nil {
 		log.Printf("Warning: Could not load KJV Bible data: %v", err)
 		log.Println("Bible search will not be available")
@@ -336,8 +356,9 @@ func handleOBSWebSocket(w http.ResponseWriter, r *http.Request) {
 	}
 	defer conn.Close()
 
+	client := &Client{conn: conn}
 	obsClientsMutex.Lock()
-	obsClients = append(obsClients, conn)
+	obsClients = append(obsClients, client)
 	obsClientsMutex.Unlock()
 	log.Println("OBS client connected")
 
@@ -347,8 +368,8 @@ func handleOBSWebSocket(w http.ResponseWriter, r *http.Request) {
 			log.Println("OBS client disconnected:", err)
 			obsClientsMutex.Lock()
 			// Remove the connection from the slice
-			for i, client := range obsClients {
-				if client == conn {
+			for i, c := range obsClients {
+				if c == client {
 					obsClients = append(obsClients[:i], obsClients[i+1:]...)
 					break
 				}
@@ -367,7 +388,10 @@ func handleControlWebSocket(w http.ResponseWriter, r *http.Request) {
 	}
 	defer conn.Close()
 
-	controlClients = append(controlClients, conn)
+	client := &Client{conn: conn}
+	controlClientsMutex.Lock()
+	controlClients = append(controlClients, client)
+	controlClientsMutex.Unlock()
 	log.Println("Control client connected")
 
 	for {
@@ -376,12 +400,14 @@ func handleControlWebSocket(w http.ResponseWriter, r *http.Request) {
 		if err != nil {
 			log.Println("Control client disconnected:", err)
 			// Remove client from slice
-			for i, client := range controlClients {
-				if client == conn {
+			controlClientsMutex.Lock()
+			for i, c := range controlClients {
+				if c == client {
 					controlClients = append(controlClients[:i], controlClients[i+1:]...)
 					break
 				}
 			}
+			controlClientsMutex.Unlock()
 			break
 		}
 
@@ -605,6 +631,104 @@ func handleControlWebSocket(w http.ResponseWriter, r *http.Request) {
 				}
 			}
 
+		case "transcript":
+			var req struct {
+				Type           string `json:"type"`
+				Text           string `json:"text"`
+				CurrentBook    string `json:"currentBook"`
+				CurrentChapter int    `json:"currentChapter"`
+				CurrentVerse   int    `json:"currentVerse"`
+			}
+			if err := json.Unmarshal(rawMsg, &req); err == nil {
+				// Only process if text is significant enough (e.g., > 10 chars)
+				if len(req.Text) > 10 {
+					go func() {
+						suggestion, err := aiClient.AnalyzeTranscript(req.Text, req.CurrentBook, req.CurrentChapter, req.CurrentVerse)
+						if err != nil {
+							log.Printf("AI Error: %v", err)
+							return
+						}
+
+						if suggestion != nil && suggestion.Action != "none" {
+							// Send suggestion back to client
+							response := struct {
+								Type       string        `json:"type"`
+								Suggestion *AISuggestion `json:"suggestion"`
+							}{
+								Type:       "ai_suggestion",
+								Suggestion: suggestion,
+							}
+
+							// Send to the control client that sent the request
+							// Note: In a real scenario we might want to broadcast to all control clients
+							// but for now, sending to the requester is safer.
+							// However, we need to access the connection in a thread-safe way or pass it.
+							// Since 'conn' is available here in the closure, we can try using it,
+							// but writing to it concurrently might be an issue if not protected.
+							// Gorilla websocket supports one concurrent writer.
+							// We'll use a simple mutex or channel in a robust app, but here we risk it for the demo or just lock.
+
+							// Ideally we should push this to a channel that the main loop reads, but
+							// for simplicity in this script, we'll just log it.
+							// Actually, we can't write to 'conn' from this goroutine safely if the main loop is also writing.
+							// BUT the main loop reads. Writing happens in response.
+							// So we need to be careful.
+
+							// Let's just log for now to prove it works, and maybe try to write if we add a mutex to the conn.
+							// To do it properly, we should wrap the conn.
+
+							// UPDATE: For this specific task, I'll send it back directly in the main loop context
+							// if I can, but AI is slow.
+							// So I should probably just send it.
+
+							// Let's risk the write collision for this prototype or just print.
+							// To be safe, let's wrap the write in a mutex or use the message channel.
+							log.Printf("AI Suggestion: %+v", suggestion)
+
+							// Hack: We can send it to ALL control clients since we have a global list
+							// but we need to lock the list.
+							// 'controlClients' doesn't have a mutex in existing code?
+							// It does not. That's a bug in existing code (append is not safe if concurrent).
+							// But main loop is single threaded per connection.
+
+							// Let's implement a thread-safe broadcast for control clients
+							// For now, I will just ignore the thread safety for the specific AI response
+							// because adding a mutex everywhere is a bigger refactor.
+							// Wait, I can just use the existing loop structure?
+							// No, the AI call is blocking.
+
+							// Let's spin up the AI call.
+							// When it returns, we need to write to the websocket.
+
+							// I will add a simple mutex for control clients writing if needed,
+							// but for now let's just use the fact that we are in a handler.
+							// If we block the handler, the UI freezes.
+							// So we MUST use a goroutine.
+
+							// Simple solution: Just send the JSON. Gorilla websocket Is NOT thread safe for concurrent writes.
+							// We need a lock.
+
+							// I'll add a global lock for writing to control clients.
+
+							responseBytes, _ := json.Marshal(response)
+
+							// We'll just iterate control clients and write, assuming low concurrency
+							// In a real production app this needs a better design.
+							controlClientsMutex.Lock()
+							for _, client := range controlClients {
+								// Thread-safe write
+								go func(c *Client) {
+									if err := c.WriteMessage(websocket.TextMessage, responseBytes); err != nil {
+										log.Printf("Error writing to client: %v", err)
+									}
+								}(client)
+							}
+							controlClientsMutex.Unlock()
+						}
+					}()
+				}
+			}
+
 		default:
 			// Handle regular message (speaker, show/hide, etc.)
 			var msg Message
@@ -628,6 +752,15 @@ func main() {
 
 	// Load speakers
 	loadSpeakers()
+
+	// Initialize AI Client
+	// Defaulting to llama3.2, user can change this if needed or we can make it configurable
+	aiClient = NewAIClient("http://localhost:11434/v1", "llama3.2")
+	if aiClient.CheckAvailability() {
+		log.Println("Local AI (Ollama) is available")
+	} else {
+		log.Println("Warning: Local AI (Ollama) not detected at http://localhost:11434")
+	}
 
 	// Serve static files
 	http.Handle("/", http.FileServer(http.Dir("./")))

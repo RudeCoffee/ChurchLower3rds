@@ -407,6 +407,13 @@
             <div class="form-group">
                 <button id="listenBtn" onclick="toggleListening()">🎤 Start Listening</button>
                 <button id="testMicBtn" onclick="testMicrophone()" style="margin-left: 10px; background-color: #6c757d;">🔍 Test Mic</button>
+                <div style="margin-top: 10px; display: flex; align-items: center; gap: 10px;">
+                    <label class="auto-advance-switch">
+                        <input type="checkbox" id="aiAssistantSwitch" onchange="toggleAIAssistant()">
+                        <span class="slider"></span>
+                    </label>
+                    <span title="Use Local AI (Ollama) for smarter verse detection">🤖 Local AI Assistant</span>
+                </div>
                 <div id="listeningStatus" style="margin: 10px 0; font-style: italic; color: #666; min-height: 40px; font-size: 13px;">Not listening</div>
             </div>
             
@@ -415,6 +422,18 @@
                 <div id="transcriptionText" style="margin-top: 5px; font-style: italic;"></div>
             </div>
             
+            <div id="aiSuggestionBox" style="background: #e8f4fd; border: 1px solid #2196F3; border-radius: 4px; padding: 10px; margin: 10px 0; display: none;">
+                <div style="display: flex; justify-content: space-between; align-items: center;">
+                    <strong style="color: #0d47a1;">🤖 AI Suggestion:</strong>
+                    <button onclick="dismissAISuggestion()" style="padding: 2px 8px; font-size: 10px; background: #999;">✕</button>
+                </div>
+                <div id="aiSuggestionText" style="margin: 5px 0; font-weight: bold; color: #0d47a1;"></div>
+                <div id="aiReasoning" style="font-size: 11px; color: #555; font-style: italic;"></div>
+                <div style="margin-top: 8px;">
+                    <button id="aiApplyBtn" onclick="applyAISuggestion()" style="padding: 5px 10px; font-size: 12px; background: #2196F3;">Apply Verse</button>
+                </div>
+            </div>
+
             <div id="suggestionsList" style="display: none;">
                 <h3 style="margin: 15px 0 10px 0; font-size: 14px; color: var(--button-bg);">Scripture Suggestions:</h3>
                 <div id="suggestions" style="max-height: 200px; overflow-y: auto;"></div>
@@ -548,6 +567,9 @@
         let currentVerseWords = [];
         let lastSpokenWordIndex = -1;
         let finalizedTranscriptForVerse = '';
+        let isAIAssistantActive = false;
+        let lastTranscriptSentTime = 0;
+        let currentAISuggestion = null;
         
         // Additional variables for consistency
         let currentBook = '';
@@ -885,8 +907,83 @@
                     case 'speakers_response':
                         handleSpeakersResponse(data.speakers);
                         break;
+                    case 'ai_suggestion':
+                        handleAISuggestion(data.suggestion);
+                        break;
                 }
             };
+        }
+
+        function toggleAIAssistant() {
+            isAIAssistantActive = document.getElementById('aiAssistantSwitch').checked;
+            const status = document.getElementById('listeningStatus');
+            if (isAIAssistantActive) {
+                // Check if listening is on
+                if (!isListening) {
+                    toggleListening();
+                }
+                status.innerHTML += '<br><small style="color: #2196F3">🤖 Local AI is active. Analyzing speech...</small>';
+            } else {
+                dismissAISuggestion();
+            }
+        }
+
+        function handleAISuggestion(suggestion) {
+            if (!isAIAssistantActive) return;
+
+            console.log('Received AI Suggestion:', suggestion);
+            currentAISuggestion = suggestion;
+
+            const box = document.getElementById('aiSuggestionBox');
+            const textDiv = document.getElementById('aiSuggestionText');
+            const reasonDiv = document.getElementById('aiReasoning');
+
+            const verseRef = `${suggestion.book} ${suggestion.chapter}:${suggestion.verse}`;
+
+            // If the suggestion matches current verse, maybe ignore or show confirmation
+            if (currentBook === suggestion.book && currentChapter === suggestion.chapter && currentVerse === suggestion.verse) {
+                return;
+            }
+
+            textDiv.textContent = verseRef;
+            reasonDiv.textContent = suggestion.reasoning || "AI detected this verse context.";
+            box.style.display = 'block';
+
+            // Auto-advance if configured and confidence is high
+            // For now, we just show the box.
+        }
+
+        function applyAISuggestion() {
+            if (currentAISuggestion) {
+                navigateToVerse(`${currentAISuggestion.book} ${currentAISuggestion.chapter}:${currentAISuggestion.verse}`);
+                dismissAISuggestion();
+            }
+        }
+
+        function dismissAISuggestion() {
+            document.getElementById('aiSuggestionBox').style.display = 'none';
+            currentAISuggestion = null;
+        }
+
+        function sendTranscriptToAI(text) {
+            if (!isAIAssistantActive || !ws || ws.readyState !== WebSocket.OPEN) return;
+
+            // Debounce: only send every 2 seconds or if text is long enough
+            const now = Date.now();
+            if (now - lastTranscriptSentTime < 2000) return;
+
+            // Don't send very short texts
+            if (text.length < 15) return;
+
+            ws.send(JSON.stringify({
+                type: 'transcript',
+                text: text,
+                currentBook: currentBook || '',
+                currentChapter: currentChapter || 0,
+                currentVerse: currentVerse || 0
+            }));
+
+            lastTranscriptSentTime = now;
         }
 
         function requestBooks(filter = '') {
@@ -1956,6 +2053,15 @@
                 // 5. Efficient, Incremental Suggestion Update
                 if (finalTranscript) {
                     recentTranscription += finalTranscript;
+
+                    // Send to AI if enabled
+                    if (isAIAssistantActive) {
+                        // We send the recent buffer
+                        // To avoid sending too much history, maybe just the last 200 chars?
+                        const contextToSend = recentTranscription.slice(-500); // Send last 500 chars
+                        sendTranscriptToAI(contextToSend);
+                    }
+
                     const newWords = finalTranscript.toLowerCase().replace(/[^\w\s]/g, '').split(' ').filter(w => w);
 
                     for (const newWord of newWords) {
