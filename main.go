@@ -111,6 +111,13 @@ var bibleData BibleData
 var speakers []string
 var aiClient *AIClient
 
+var currentState struct {
+	Book    string
+	Chapter int
+	Verse   int
+	mu      sync.Mutex
+}
+
 func loadSpeakers() {
 	data, err := os.ReadFile("speakers.txt")
 	if err != nil {
@@ -516,6 +523,13 @@ func handleControlWebSocket(w http.ResponseWriter, r *http.Request) {
 			if err := json.Unmarshal(rawMsg, &req); err == nil {
 				verse := getVerse(req.Book, req.Chapter, req.Verse)
 				if verse != nil {
+					// Update current state
+					currentState.mu.Lock()
+					currentState.Book = req.Book
+					currentState.Chapter = req.Chapter
+					currentState.Verse = req.Verse
+					currentState.mu.Unlock()
+
 					// Send verse to OBS
 					obsMsg := Message{
 						Type:  "bible",
@@ -640,10 +654,46 @@ func handleControlWebSocket(w http.ResponseWriter, r *http.Request) {
 				CurrentVerse   int    `json:"currentVerse"`
 			}
 			if err := json.Unmarshal(rawMsg, &req); err == nil {
+				// Broadcast transcript to other clients (so they can see what server hears)
+				transcriptMsg := struct {
+					Type string `json:"type"`
+					Text string `json:"text"`
+				}{
+					Type: "transcript",
+					Text: req.Text,
+				}
+				transcriptBytes, _ := json.Marshal(transcriptMsg)
+
+				controlClientsMutex.Lock()
+				for _, c := range controlClients {
+					if c != client {
+						// Copy the client pointer to use in the goroutine
+						targetClient := c
+						go func() {
+							// WriteMessage uses internal mutex, so this is safe concurrent access to the socket
+							targetClient.WriteMessage(websocket.TextMessage, transcriptBytes)
+						}()
+					}
+				}
+				controlClientsMutex.Unlock()
+
+				// Fill in context from global state if missing (e.g. from headless audio listener)
+				currentBook := req.CurrentBook
+				currentChapter := req.CurrentChapter
+				currentVerse := req.CurrentVerse
+
+				if currentBook == "" {
+					currentState.mu.Lock()
+					currentBook = currentState.Book
+					currentChapter = currentState.Chapter
+					currentVerse = currentState.Verse
+					currentState.mu.Unlock()
+				}
+
 				// Only process if text is significant enough (e.g., > 10 chars)
 				if len(req.Text) > 10 {
 					go func() {
-						suggestion, err := aiClient.AnalyzeTranscript(req.Text, req.CurrentBook, req.CurrentChapter, req.CurrentVerse)
+						suggestion, err := aiClient.AnalyzeTranscript(req.Text, currentBook, currentChapter, currentVerse)
 						if err != nil {
 							log.Printf("AI Error: %v", err)
 							return
@@ -659,69 +709,20 @@ func handleControlWebSocket(w http.ResponseWriter, r *http.Request) {
 								Suggestion: suggestion,
 							}
 
-							// Send to the control client that sent the request
-							// Note: In a real scenario we might want to broadcast to all control clients
-							// but for now, sending to the requester is safer.
-							// However, we need to access the connection in a thread-safe way or pass it.
-							// Since 'conn' is available here in the closure, we can try using it,
-							// but writing to it concurrently might be an issue if not protected.
-							// Gorilla websocket supports one concurrent writer.
-							// We'll use a simple mutex or channel in a robust app, but here we risk it for the demo or just lock.
-
-							// Ideally we should push this to a channel that the main loop reads, but
-							// for simplicity in this script, we'll just log it.
-							// Actually, we can't write to 'conn' from this goroutine safely if the main loop is also writing.
-							// BUT the main loop reads. Writing happens in response.
-							// So we need to be careful.
-
-							// Let's just log for now to prove it works, and maybe try to write if we add a mutex to the conn.
-							// To do it properly, we should wrap the conn.
-
-							// UPDATE: For this specific task, I'll send it back directly in the main loop context
-							// if I can, but AI is slow.
-							// So I should probably just send it.
-
-							// Let's risk the write collision for this prototype or just print.
-							// To be safe, let's wrap the write in a mutex or use the message channel.
 							log.Printf("AI Suggestion: %+v", suggestion)
-
-							// Hack: We can send it to ALL control clients since we have a global list
-							// but we need to lock the list.
-							// 'controlClients' doesn't have a mutex in existing code?
-							// It does not. That's a bug in existing code (append is not safe if concurrent).
-							// But main loop is single threaded per connection.
-
-							// Let's implement a thread-safe broadcast for control clients
-							// For now, I will just ignore the thread safety for the specific AI response
-							// because adding a mutex everywhere is a bigger refactor.
-							// Wait, I can just use the existing loop structure?
-							// No, the AI call is blocking.
-
-							// Let's spin up the AI call.
-							// When it returns, we need to write to the websocket.
-
-							// I will add a simple mutex for control clients writing if needed,
-							// but for now let's just use the fact that we are in a handler.
-							// If we block the handler, the UI freezes.
-							// So we MUST use a goroutine.
-
-							// Simple solution: Just send the JSON. Gorilla websocket Is NOT thread safe for concurrent writes.
-							// We need a lock.
-
-							// I'll add a global lock for writing to control clients.
 
 							responseBytes, _ := json.Marshal(response)
 
-							// We'll just iterate control clients and write, assuming low concurrency
-							// In a real production app this needs a better design.
+							// Broadcast suggestion to all control clients
 							controlClientsMutex.Lock()
-							for _, client := range controlClients {
-								// Thread-safe write
-								go func(c *Client) {
-									if err := c.WriteMessage(websocket.TextMessage, responseBytes); err != nil {
+							for _, c := range controlClients {
+								// Copy pointer for goroutine
+								targetClient := c
+								go func() {
+									if err := targetClient.WriteMessage(websocket.TextMessage, responseBytes); err != nil {
 										log.Printf("Error writing to client: %v", err)
 									}
-								}(client)
+								}()
 							}
 							controlClientsMutex.Unlock()
 						}

@@ -23,12 +23,33 @@
      -   Ensure Ollama is running (it usually starts automatically in the background).
      -   You can verify it's running by visiting `http://localhost:11434` in your browser.
 
+ ## Server-Side Audio Transcription (Faster)
+
+ The browser-based speech recognition can sometimes be slow or unreliable. For faster response times, you can run the audio listener directly on the server (the media computer).
+
+ ### Setup
+
+ 1.  **Install Python Dependencies**:
+     ```bash
+     pip install -r requirements.txt
+     ```
+     *Note: You may need to install PortAudio system libraries (e.g., `sudo apt-get install portaudio19-dev` on Linux or `brew install portaudio` on Mac) for `pyaudio` to work.*
+
+ 2.  **Run the Audio Listener**:
+     -   Make sure your microphone is connected and set as default.
+     -   Run the script:
+         ```bash
+         python3 audio_listener.py
+         ```
+     -   The script will listen to the audio, transcribe it locally using Whisper, and send it to the Go server.
+     -   The Control Client web interface will show "Server Audio Active".
+
  ## Usage
 
  1.  Start the Church Lower 3rds application (`go run main.go`).
- 2.  Open the Control Client (`http://localhost:8080/client.html`).
- 3.  Click the **"Local AI Assistant"** toggle switch.
- 4.  If the microphone is not active, it will ask for permission.
+ 2.  (Optional) Start the server-side audio listener (`python3 audio_listener.py`).
+ 3.  Open the Control Client (`http://localhost:8080/client.html`).
+ 4.  Click the **"Local AI Assistant"** toggle switch.
  5.  Start speaking or listening to the sermon.
  6.  When the AI detects a verse reference or a transition, a blue suggestion box will appear.
  7.  Click **"Apply Verse"** to immediately display it.
