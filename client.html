@@ -910,8 +910,60 @@
                     case 'ai_suggestion':
                         handleAISuggestion(data.suggestion);
                         break;
+                    case 'transcript':
+                        handleServerTranscript(data.text);
+                        break;
                 }
             };
+        }
+
+        function handleServerTranscript(text) {
+            // Update the transcript display with text from server
+            const transcriptionBox = document.getElementById('transcriptionBox');
+            const transcriptionText = document.getElementById('transcriptionText');
+            const status = document.getElementById('listeningStatus');
+
+            transcriptionBox.style.display = 'block';
+            transcriptionText.innerHTML = `<strong>Server:</strong> ${text}`;
+
+            // If we are not locally listening, show that server is active
+            if (!isListening) {
+                status.innerHTML = '<span class="listening-indicator" style="background: #2196F3"></span>Server Audio Active';
+            }
+
+            // Also update the internal logic for suggestions if we want client-side suggestions from server audio
+            // For now, we rely on server-side AI for server audio, but we could feed it into
+            // the local suggestion engine too.
+            // Let's minimally feed it to the suggestion engine so "Scripture Suggestions" works
+            // even with server audio.
+
+            // We append to recentTranscription
+            recentTranscription += " " + text;
+            const newWords = text.toLowerCase().replace(/[^\w\s]/g, '').split(' ').filter(w => w);
+
+            for (const newWord of newWords) {
+                keywordWindow.push(newWord);
+                if (biblicalKeywords[newWord]) {
+                    suggestionKeywords.set(newWord, (suggestionKeywords.get(newWord) || 0) + 1);
+                }
+                if (keywordWindow.length > 50) {
+                     const oldWord = keywordWindow.shift();
+                     if (biblicalKeywords[oldWord]) {
+                         const currentCount = suggestionKeywords.get(oldWord);
+                         if (currentCount > 1) {
+                             suggestionKeywords.set(oldWord, currentCount - 1);
+                         } else {
+                             suggestionKeywords.delete(oldWord);
+                         }
+                     }
+                }
+            }
+
+            const now = Date.now();
+            if (now - lastSuggestionUpdate > 2000) {
+                updateSuggestions();
+                lastSuggestionUpdate = now;
+            }
         }
 
         function toggleAIAssistant() {

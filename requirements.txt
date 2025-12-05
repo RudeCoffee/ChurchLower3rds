@@ -1,0 +1,4 @@
+websocket-client
+SpeechRecognition
+openai-whisper
+pyaudio
