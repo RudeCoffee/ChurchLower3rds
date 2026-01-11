@@ -1259,7 +1259,7 @@
                 const item = document.createElement('div');
                 item.className = 'autocomplete-item';
                 item.textContent = speaker;
-                item.addEventListener('click', () => {
+                item.addEventListener('mousedown', () => {
                     selectSpeaker(speaker);
                 });
                 dropdown.appendChild(item);
@@ -1414,7 +1414,7 @@
                     div.classList.add('selected');
                 }
                 div.textContent = book;
-                div.onclick = () => selectBook(book);
+                div.onmousedown = () => selectBook(book);
                 dropdown.appendChild(div);
             });
             
@@ -1843,7 +1843,7 @@
                 const item = document.createElement('div');
                 item.className = 'autocomplete-item';
                 item.textContent = book;
-                item.addEventListener('click', () => selectQuickVerseSuggestion(book));
+                item.addEventListener('mousedown', () => selectQuickVerseSuggestion(book));
                 dropdown.appendChild(item);
             });
             
