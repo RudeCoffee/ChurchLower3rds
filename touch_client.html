@@ -235,7 +235,6 @@
 
         .btn-hide {
             background-color: var(--danger-bg);
-            grid-column: 2; /* If we want it to replace display or be separate? Logic will handle */
         }
 
         .btn-nav {
@@ -348,9 +347,11 @@
 
                 <div class="control-actions">
                     <button class="action-btn btn-nav" onclick="prevVerse()">← Prev</button>
-                    <!-- Display Button container to swap with Hide -->
-                    <button id="btn-display" class="action-btn btn-display" onclick="displayVerse()">DISPLAY</button>
-                    <button id="btn-hide" class="action-btn btn-hide" onclick="hideVerse()" style="display: none;">HIDE</button>
+
+                    <div id="center-actions" style="grid-column: 2; display: flex; gap: 10px;">
+                        <button id="btn-display" class="action-btn btn-display" style="flex: 1;" onclick="displayVerse()">DISPLAY</button>
+                        <button id="btn-hide" class="action-btn btn-hide" style="flex: 1; display: none;" onclick="hideVerse()">HIDE</button>
+                    </div>
 
                     <button class="action-btn btn-nav" onclick="nextVerse()">Next →</button>
                 </div>
@@ -412,6 +413,7 @@
         let selectedVerse = 0;
         let currentView = 'books'; // books, chapters, verses, control
         let isLive = false;
+        let isOutputActive = false;
 
         // Data
         let books = [];
@@ -620,7 +622,12 @@
             if (isLive) {
                 document.getElementById('btn-display').style.display = 'none';
                 document.getElementById('btn-hide').style.display = 'block';
+            } else if (isOutputActive) {
+                // Previewing a new verse, but output is active elsewhere
+                document.getElementById('btn-display').style.display = 'block';
+                document.getElementById('btn-hide').style.display = 'block';
             } else {
+                // Previewing, output inactive
                 document.getElementById('btn-display').style.display = 'block';
                 document.getElementById('btn-hide').style.display = 'none';
             }
@@ -715,6 +722,7 @@
                 ws.send(JSON.stringify({ type: 'get_verse', book: selectedBook, chapter: selectedChapter, verse: selectedVerse }));
             }
             isLive = true;
+            isOutputActive = true;
             updateButtons();
             debounceButtons();
         }
@@ -724,6 +732,7 @@
                 ws.send(JSON.stringify({ type: 'bible', show: false }));
             }
             isLive = false;
+            isOutputActive = false;
             updateButtons();
             debounceButtons();
         }
@@ -733,6 +742,7 @@
                 ws.send(JSON.stringify({ type: 'get_next_verse', book: selectedBook, chapter: selectedChapter, verse: selectedVerse }));
             }
             isLive = true;
+            isOutputActive = true;
             updateButtons();
         }
 
@@ -741,6 +751,7 @@
                 ws.send(JSON.stringify({ type: 'get_prev_verse', book: selectedBook, chapter: selectedChapter, verse: selectedVerse }));
             }
             isLive = true;
+            isOutputActive = true;
             updateButtons();
         }
 
