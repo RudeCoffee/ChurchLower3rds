@@ -318,6 +318,11 @@
                     <div id="preview-text"></div>
                 </div>
 
+                <div id="next-verse-preview" class="preview-box" style="margin-top: 10px; font-size: 18px; color: #aaa; border-color: #555; display: none; flex-grow: 0.5;">
+                    <span class="preview-ref" id="next-preview-ref" style="font-size: 20px; color: #888;"></span>
+                    <div id="next-preview-text"></div>
+                </div>
+
                 <div class="control-actions">
                     <button class="action-btn btn-nav" onclick="prevVerse()">← Prev</button>
                     <!-- Display Button container to swap with Hide -->
@@ -434,8 +439,16 @@
                     break;
                 case 'verse_preview':
                 case 'next_verse_response': // handle next verse nav result
+                case 'prev_verse_response': // handle prev verse nav result
                     if (data.verse) {
                         showControlView(data.verse);
+                    }
+                    break;
+                case 'next_verse_preview':
+                    if (data.verse) {
+                        showNextVersePreview(data.verse);
+                    } else {
+                        document.getElementById('next-verse-preview').style.display = 'none';
                     }
                     break;
                 case 'speakers_response':
@@ -543,6 +556,24 @@
             }
         }
 
+        function requestNextVersePreview(book, chapter, verse) {
+            if (ws && ws.readyState === WebSocket.OPEN) {
+                ws.send(JSON.stringify({
+                    type: 'preview_next_verse',
+                    book: book,
+                    chapter: chapter,
+                    verse: verse
+                }));
+            }
+        }
+
+        function showNextVersePreview(verse) {
+             const verseRef = verse.name || `${verse.chapter}:${verse.verse}`;
+             document.getElementById('next-preview-ref').textContent = "Next: " + verseRef;
+             document.getElementById('next-preview-text').textContent = verse.text;
+             document.getElementById('next-verse-preview').style.display = 'block';
+        }
+
         function showControlView(verseData) {
             const verseRef = verseData.name || `${selectedBook} ${selectedChapter}:${selectedVerse}`;
             const verseText = verseData.text;
@@ -551,12 +582,18 @@
             document.getElementById('preview-text').textContent = verseText;
             document.getElementById('bible-nav-title').textContent = verseRef;
 
+            // Clear previous next preview until loaded
+            document.getElementById('next-verse-preview').style.display = 'none';
+
             updateButtons();
 
             showBibleView('control');
 
             if(verseData.chapter) selectedChapter = verseData.chapter;
             if(verseData.verse) selectedVerse = verseData.verse;
+
+            // Request next verse preview
+            requestNextVersePreview(selectedBook, selectedChapter, selectedVerse);
         }
 
         function updateButtons() {
@@ -634,15 +671,11 @@
         }
 
         function prevVerse() {
-            if (selectedVerse > 1) {
-                selectedVerse--;
-                if (ws && ws.readyState === WebSocket.OPEN) {
-                    ws.send(JSON.stringify({ type: 'get_verse', book: selectedBook, chapter: selectedChapter, verse: selectedVerse }));
-                    ws.send(JSON.stringify({ type: 'preview_verse', book: selectedBook, chapter: selectedChapter, verse: selectedVerse }));
-                }
-                isLive = true;
-                updateButtons();
+             if (ws && ws.readyState === WebSocket.OPEN) {
+                ws.send(JSON.stringify({ type: 'get_prev_verse', book: selectedBook, chapter: selectedChapter, verse: selectedVerse }));
             }
+            isLive = true;
+            updateButtons();
         }
 
         // Speaker Logic

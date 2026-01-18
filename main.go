@@ -354,6 +354,54 @@ func getNextVerse(bookName string, chapterNum int, verseNum int) *BibleVerse {
 	return nil
 }
 
+func getPrevVerse(bookName string, chapterNum int, verseNum int) *BibleVerse {
+	for i, book := range bibleData.Books {
+		if strings.EqualFold(book.Name, bookName) {
+			// 1. Try to get the previous verse in the same chapter
+			if verseNum > 1 {
+				return getVerse(bookName, chapterNum, verseNum-1)
+			}
+
+			// 2. If at verse 1, try to get the last verse of the previous chapter in the same book
+			for j, chapter := range book.Chapters {
+				if chapter.Chapter == chapterNum {
+					if j > 0 {
+						prevChapter := book.Chapters[j-1]
+						if len(prevChapter.Verses) > 0 {
+							lastVerse := prevChapter.Verses[len(prevChapter.Verses)-1]
+							return &BibleVerse{
+								Chapter: lastVerse.Chapter,
+								Text:    lastVerse.Text,
+								Verse:   lastVerse.Verse,
+								Name:    lastVerse.Name,
+							}
+						}
+					}
+					// 3. If at first chapter of book, try to get the last verse of the previous book
+					if j == 0 && i > 0 {
+						prevBook := bibleData.Books[i-1]
+						if len(prevBook.Chapters) > 0 {
+							lastChapter := prevBook.Chapters[len(prevBook.Chapters)-1]
+							if len(lastChapter.Verses) > 0 {
+								lastVerse := lastChapter.Verses[len(lastChapter.Verses)-1]
+								return &BibleVerse{
+									Chapter: lastVerse.Chapter,
+									Text:    lastVerse.Text,
+									Verse:   lastVerse.Verse,
+									Name:    lastVerse.Name,
+								}
+							}
+						}
+					}
+					break
+				}
+			}
+			break
+		}
+	}
+	return nil
+}
+
 func handleOBSWebSocket(w http.ResponseWriter, r *http.Request) {
 	conn, err := upgrader.Upgrade(w, r, nil)
 	if err != nil {
@@ -583,6 +631,51 @@ func handleControlWebSocket(w http.ResponseWriter, r *http.Request) {
 						Verse *BibleVerse `json:"verse"`
 					}{
 						Type:  "next_verse_response",
+						Verse: nil,
+					}
+					conn.WriteJSON(response)
+				}
+			}
+
+		case "get_prev_verse":
+			var req struct {
+				Type    string `json:"type"`
+				Book    string `json:"book"`
+				Chapter int    `json:"chapter"`
+				Verse   int    `json:"verse"`
+			}
+			if err := json.Unmarshal(rawMsg, &req); err == nil {
+				prevVerse := getPrevVerse(req.Book, req.Chapter, req.Verse)
+				if prevVerse != nil {
+					// Send verse to OBS for display
+					obsMsg := Message{
+						Type:  "bible",
+						Book:  prevVerse.Name,
+						Verse: prevVerse.Text,
+						Show:  true,
+					}
+					obsClientsMutex.Lock()
+					for _, client := range obsClients {
+						client.WriteJSON(obsMsg)
+					}
+					obsClientsMutex.Unlock()
+
+					// Send response back to control client with new verse info
+					response := struct {
+						Type  string     `json:"type"`
+						Verse BibleVerse `json:"verse"`
+					}{
+						Type:  "prev_verse_response",
+						Verse: *prevVerse,
+					}
+					conn.WriteJSON(response)
+				} else {
+					// No prev verse available
+					response := struct {
+						Type  string      `json:"type"`
+						Verse *BibleVerse `json:"verse"`
+					}{
+						Type:  "prev_verse_response",
 						Verse: nil,
 					}
 					conn.WriteJSON(response)
