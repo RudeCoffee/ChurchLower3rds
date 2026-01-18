@@ -24,26 +24,10 @@
             transition: opacity 0.5s ease-in-out, transform 0.5s ease-in-out;
         }
 
-        #logoContainer {
-            background-color: white;
-            border-radius: 0;
-            /* No rounded corners */
-            padding: 10px;
-            flex-shrink: 0;
-            display: flex;
-            align-items: flex-end;
-            /* Aligns the logo to the bottom of this container */
-        }
-
-        #logo {
-            width: 110px;
-            height: 110px;
-            display: block;
-        }
-
         #bibleTextContainer {
             background-color: #224269;
             padding: 20px;
+            border-top: 6px solid white;
             border-radius: 0;
             /* No rounded corners */
             display: flex;
@@ -79,23 +63,10 @@
             transition: opacity 0.5s ease-in-out, transform 0.5s ease-in-out;
         }
 
-        #speakerLogoContainer {
-            background-color: white;
-            padding: 10px;
-            flex-shrink: 0;
-            display: flex;
-            align-items: flex-end;
-        }
-
-        #speakerLogo {
-            width: 110px;
-            height: 110px;
-            display: block;
-        }
-
         #speakerTextContainer {
             background-color: #224269;
             padding: 20px;
+            border-top: 6px solid white;
             display: flex;
             align-items: flex-end;
             /* Aligns text to the bottom */
@@ -118,9 +89,6 @@
 
 <body>
     <div id="bibleContainer" class="bible">
-        <div id="logoContainer">
-            <img id="logo" src="logoTransparent.png" alt="Logo">
-        </div>
         <div id="bibleTextContainer">
             <div id="bibleBook"></div>
             <div id="bibleVerse"></div>
@@ -128,9 +96,6 @@
     </div>
 
     <div id="speakerContainer" class="speaker">
-        <div id="speakerLogoContainer">
-            <img id="speakerLogo" src="logoTransparent.png" alt="Logo">
-        </div>
         <div id="speakerTextContainer">
             <div id="speakerName"></div>
         </div>
