@@ -83,6 +83,7 @@
             grid-template-columns: 2fr 1fr 1fr;
             gap: 10px;
             margin-bottom: 15px;
+            position: relative;
         }
         .verse-navigation {
             display: grid;
@@ -273,7 +274,7 @@
             color: var(--button-bg);
         }
         .selector-container {
-            position: relative;
+            /* position: relative; Removed to allow overlay to span full width of verse-selector */
         }
         .selector-trigger {
             width: 100%;
@@ -295,16 +296,17 @@
             top: 100%;
             left: 0;
             right: 0;
-            z-index: 1001;
+            z-index: 2001;
             background: var(--dropdown-bg);
             border: 1px solid var(--border-color);
             box-shadow: 0 4px 6px rgba(0,0,0,0.3);
             flex-wrap: wrap;
             gap: 8px;
             padding: 10px;
-            max-height: 300px;
+            max-height: 60vh;
             overflow-y: auto;
-            border-radius: 0 0 4px 4px;
+            border-radius: 4px;
+            margin-top: 5px;
         }
         .selection-grid.show {
             display: flex;
@@ -336,7 +338,7 @@
     
     <div class="status" id="status">Connecting...</div>
     
-    <div class="container">
+    <div class="container" style="position: relative; z-index: 10;">
         <h1>Church Lower 3rds Control</h1>
         
         <h2>Bible Verse Display</h2>
@@ -1018,8 +1020,15 @@
 
         function showSpeakerDropdown(speakerList) {
             const dropdown = document.getElementById('speakerDropdown');
+            const input = document.getElementById('speakerInput');
             dropdown.innerHTML = '';
             
+            // Do not show dropdown if input is not focused and empty (prevents opening on initial load)
+            if (document.activeElement !== input && (!input.value || input.value.trim() === '')) {
+                dropdown.style.display = 'none';
+                return;
+            }
+
             if (speakerList.length === 0) {
                 dropdown.style.display = 'none';
                 return;
