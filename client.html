@@ -331,6 +331,11 @@
             color: white;
             border-color: var(--button-bg);
         }
+        .grid-button.highlighted {
+            background-color: var(--preview-bg);
+            border-color: var(--button-bg);
+            outline: 2px solid var(--button-bg);
+        }
     </style>
 </head>
 <body class="light-mode">
@@ -345,7 +350,7 @@
         <div class="verse-selector">
             <div class="selector-container">
                 <label for="bookInput">Book</label>
-                <input type="text" id="bookInput" placeholder="Type book name..." autocomplete="off" onfocus="showOverlay('bookGrid')" onclick="showOverlay('bookGrid')">
+                <input type="text" id="bookInput" placeholder="Type book name..." autocomplete="off" onfocus="showOverlay('bookGrid')" onclick="showOverlay('bookGrid')" onkeydown="handleBookKeydown(event)">
                 <div id="bookGrid" class="selection-grid"></div>
             </div>
             
@@ -433,6 +438,7 @@
         let selectedChapter = 0;
         let selectedVerse = 0;
         let currentAutocompleteIndex = -1;
+        let currentBookIndex = -1;
         let books = [];
         let speakers = [];
         let currentSpeakerIndex = -1;
@@ -862,6 +868,7 @@
 
         function handleBooksResponse(bookList) {
             books = bookList;
+            currentBookIndex = -1;
             updateBookGrid(bookList);
         }
 
@@ -869,7 +876,7 @@
             const grid = document.getElementById('bookGrid');
             grid.innerHTML = '';
             
-            bookList.forEach(book => {
+            bookList.forEach((book, index) => {
                 const button = document.createElement('div');
                 button.className = 'grid-button';
                 if (book === selectedBook) {
@@ -877,7 +884,50 @@
                 }
                 button.textContent = book;
                 button.onclick = () => selectBook(book);
+                button.dataset.index = index;
                 grid.appendChild(button);
+            });
+        }
+
+        function handleBookKeydown(event) {
+            const grid = document.getElementById('bookGrid');
+            const buttons = grid.getElementsByClassName('grid-button');
+
+            if (event.ctrlKey || event.altKey || event.metaKey) return;
+
+            if (event.key === 'ArrowDown' || event.key === 'ArrowRight') {
+                event.preventDefault();
+                showOverlay('bookGrid');
+                currentBookIndex = Math.min(currentBookIndex + 1, buttons.length - 1);
+                if (currentBookIndex < 0 && buttons.length > 0) currentBookIndex = 0;
+                updateBookHighlight(buttons);
+            } else if (event.key === 'ArrowUp' || event.key === 'ArrowLeft') {
+                event.preventDefault();
+                showOverlay('bookGrid');
+                currentBookIndex = Math.max(currentBookIndex - 1, -1);
+                updateBookHighlight(buttons);
+            } else if (event.key === 'Enter') {
+                if (currentBookIndex >= 0 && buttons[currentBookIndex]) {
+                    event.preventDefault();
+                    buttons[currentBookIndex].click();
+                    currentBookIndex = -1;
+                }
+            } else if (event.key === 'Escape') {
+                hideOverlay('bookGrid');
+                currentBookIndex = -1;
+                updateBookHighlight(buttons);
+                document.getElementById('bookInput').blur();
+            }
+        }
+
+        function updateBookHighlight(buttons) {
+            Array.from(buttons).forEach((btn, index) => {
+                if (index === currentBookIndex) {
+                    btn.classList.add('highlighted');
+                    btn.scrollIntoView({ block: 'nearest', inline: 'nearest' });
+                } else {
+                    btn.classList.remove('highlighted');
+                }
             });
         }
 
