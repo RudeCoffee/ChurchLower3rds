@@ -329,7 +329,12 @@
             </div>
 
             <!-- Views -->
-            <div id="view-books" class="grid-container"></div>
+            <div id="view-books" style="display: none; flex-direction: column; height: 100%;">
+                <div style="margin-bottom: 15px;">
+                    <input type="text" id="book-filter" placeholder="Filter Books..." oninput="filterBooks()" style="width: 100%; padding: 15px; font-size: 20px; border-radius: 8px; border: 1px solid var(--border-color); background-color: var(--container-bg); color: var(--text-color); box-sizing: border-box;">
+                </div>
+                <div id="book-grid-inner" class="grid-container" style="overflow-y: auto; flex-grow: 1;"></div>
+            </div>
             <div id="view-chapters" class="grid-container" style="display: none;"></div>
             <div id="view-verses" class="grid-container" style="display: none;"></div>
 
@@ -519,7 +524,7 @@
 
         // Bible Logic
         function renderBookGrid(list) {
-            const grid = document.getElementById('view-books');
+            const grid = document.getElementById('book-grid-inner');
             grid.innerHTML = '';
             list.forEach(book => {
                 const btn = document.createElement('div');
@@ -529,6 +534,13 @@
                 grid.appendChild(btn);
             });
             showBibleView('books');
+        }
+
+        function filterBooks() {
+            const filter = document.getElementById('book-filter').value.toLowerCase();
+            const filtered = books.filter(b => b.toLowerCase().includes(filter));
+            renderBookGrid(filtered);
+            // Ensure focus remains on input after re-render (though re-render doesn't touch input, safe)
         }
 
         function selectBook(book) {
@@ -648,7 +660,8 @@
             document.getElementById('view-verses').style.display = 'none';
             document.getElementById('view-control').style.display = 'none';
 
-            document.getElementById('view-' + viewName).style.display = (viewName === 'control' ? 'flex' : 'grid');
+            const displayType = (viewName === 'control' || viewName === 'books') ? 'flex' : 'grid';
+            document.getElementById('view-' + viewName).style.display = displayType;
 
             updateBreadcrumbs(viewName);
         }
