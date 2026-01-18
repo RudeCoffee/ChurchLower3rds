@@ -79,8 +79,8 @@
             transition: background-color 0.3s, color 0.3s, border-color 0.3s;
         }
         .verse-selector {
-            display: flex;
-            flex-direction: column;
+            display: grid;
+            grid-template-columns: 2fr 1fr 1fr;
             gap: 10px;
             margin-bottom: 15px;
         }
@@ -272,13 +272,42 @@
             font-weight: bold;
             color: var(--button-bg);
         }
-        .selection-grid {
+        .selector-container {
+            position: relative;
+        }
+        .selector-trigger {
+            width: 100%;
+            padding: 8px;
+            border: 1px solid var(--border-color);
+            border-radius: 4px;
+            font-size: 14px;
+            box-sizing: border-box;
+            background-color: var(--input-bg);
+            color: var(--text-color);
+            cursor: pointer;
+            min-height: 35px;
             display: flex;
+            align-items: center;
+        }
+        .selection-grid {
+            display: none;
+            position: absolute;
+            top: 100%;
+            left: 0;
+            right: 0;
+            z-index: 1001;
+            background: var(--dropdown-bg);
+            border: 1px solid var(--border-color);
+            box-shadow: 0 4px 6px rgba(0,0,0,0.3);
             flex-wrap: wrap;
             gap: 8px;
-            margin-top: 10px;
+            padding: 10px;
             max-height: 300px;
             overflow-y: auto;
+            border-radius: 0 0 4px 4px;
+        }
+        .selection-grid.show {
+            display: flex;
         }
         .grid-button {
             padding: 10px;
@@ -312,19 +341,21 @@
         
         <h2>Bible Verse Display</h2>
         <div class="verse-selector">
-            <div>
+            <div class="selector-container">
                 <label for="bookInput">Book</label>
-                <input type="text" id="bookInput" placeholder="Type book name..." autocomplete="off">
+                <input type="text" id="bookInput" placeholder="Type book name..." autocomplete="off" onfocus="showOverlay('bookGrid')" onclick="showOverlay('bookGrid')">
                 <div id="bookGrid" class="selection-grid"></div>
             </div>
             
-            <div>
+            <div class="selector-container">
                 <label>Chapter</label>
+                <div class="selector-trigger" id="chapterTrigger" onclick="showOverlay('chapterGrid')">Select Chapter</div>
                 <div id="chapterGrid" class="selection-grid"></div>
             </div>
             
-            <div>
+            <div class="selector-container">
                 <label>Verse</label>
+                <div class="selector-trigger" id="verseTrigger" onclick="showOverlay('verseGrid')">Select Verse</div>
                 <div id="verseGrid" class="selection-grid"></div>
             </div>
         </div>
@@ -410,6 +441,41 @@
         let currentBook = '';
         let currentChapter = 0;
         let currentVerse = 0;
+
+        let shouldOpenChapterGrid = false;
+        let shouldOpenVerseGrid = false;
+
+        // Overlay Management
+        function showOverlay(id) {
+            hideAllOverlays();
+            const overlay = document.getElementById(id);
+            if (overlay) {
+                overlay.classList.add('show');
+            }
+        }
+
+        function hideOverlay(id) {
+            const overlay = document.getElementById(id);
+            if (overlay) {
+                overlay.classList.remove('show');
+            }
+        }
+
+        function hideAllOverlays() {
+            const overlays = document.querySelectorAll('.selection-grid');
+            overlays.forEach(overlay => overlay.classList.remove('show'));
+        }
+
+        // Close overlays when clicking outside
+        document.addEventListener('click', function(event) {
+            const target = event.target;
+
+            // Check if click is inside a selector container
+            const container = target.closest('.selector-container');
+            if (!container) {
+                hideAllOverlays();
+            }
+        });
 
         // Theme toggle function
         function toggleTheme() {
@@ -819,24 +885,6 @@
         function handleBooksResponse(bookList) {
             books = bookList;
             updateBookGrid(bookList);
-            
-            // Handle pending quick selection
-            if (pendingQuickSelection) {
-                const { bookName, chapter, verse } = pendingQuickSelection;
-                
-                // Find matching book (case insensitive, flexible matching)
-                const matchedBook = bookList.find(book => 
-                    book.toLowerCase().includes(bookName.toLowerCase()) ||
-                    bookName.toLowerCase().includes(book.toLowerCase())
-                );
-                
-                if (matchedBook) {
-                    selectBook(matchedBook);
-                    pendingQuickSelection = { ...pendingQuickSelection, bookName: matchedBook };
-                } else {
-                    pendingQuickSelection = null;
-                }
-            }
         }
 
         function updateBookGrid(bookList) {
@@ -857,20 +905,13 @@
 
         function handleChaptersResponse(chapters) {
             updateChapterGrid(chapters);
-            
+
             document.getElementById('verseGrid').innerHTML = '';
             hideVersePreview();
-            
-            // Handle pending quick selection
-            if (pendingQuickSelection) {
-                const { chapter, verse } = pendingQuickSelection;
-                
-                // Check if the requested chapter exists
-                if (chapters.includes(chapter)) {
-                    selectChapter(chapter);
-                } else {
-                    pendingQuickSelection = null;
-                }
+
+            if (shouldOpenChapterGrid) {
+                showOverlay('chapterGrid');
+                shouldOpenChapterGrid = false;
             }
         }
 
@@ -896,6 +937,10 @@
             selectedVerse = 0;
             currentVerse = 0;
 
+            // Update trigger text
+            document.getElementById('chapterTrigger').textContent = `Chapter ${chapter}`;
+            document.getElementById('verseTrigger').textContent = 'Select Verse';
+
             updateChapterGrid(getChapterNumbersFromGrid()); // Re-render to update highlighting
 
             document.getElementById('verseGrid').innerHTML = '';
@@ -903,6 +948,12 @@
 
             requestVerses(selectedBook, chapter);
             updateNavigationButtons();
+
+            // Auto-open next step (Verse Grid)
+            // We can show it immediately, but it will be empty until response comes.
+            // Better to use flag again.
+            hideAllOverlays();
+            shouldOpenVerseGrid = true;
         }
 
         function getChapterNumbersFromGrid() {
@@ -913,19 +964,12 @@
 
         function handleVersesResponse(verses) {
             updateVerseGrid(verses);
-            
+
             hideVersePreview();
-            
-            // Handle pending quick selection
-            if (pendingQuickSelection) {
-                const { verse } = pendingQuickSelection;
-                
-                // Check if the requested verse exists
-                if (verses.includes(verse)) {
-                   selectVerseFromGrid(verse);
-                }
-                
-                pendingQuickSelection = null;
+
+            if (shouldOpenVerseGrid) {
+                showOverlay('verseGrid');
+                shouldOpenVerseGrid = false;
             }
         }
 
@@ -949,10 +993,16 @@
             selectedVerse = verse;
             currentVerse = verse;
 
+            // Update trigger text
+            document.getElementById('verseTrigger').textContent = `Verse ${verse}`;
+
             updateVerseGrid(getVerseNumbersFromGrid());
 
             requestVersePreview(selectedBook, selectedChapter, verse);
             updateNavigationButtons();
+
+            // Close overlays
+            hideAllOverlays();
         }
 
         function getVerseNumbersFromGrid() {
@@ -1141,6 +1191,10 @@
             selectedVerse = 0;
             currentBookData = null;
             
+            // Reset triggers
+            document.getElementById('chapterTrigger').textContent = 'Select Chapter';
+            document.getElementById('verseTrigger').textContent = 'Select Verse';
+
             // Highlight selected book button
             updateBookGrid(books);
 
@@ -1156,6 +1210,17 @@
             
             ws.send(JSON.stringify(message));
             updateNavigationButtons();
+
+            // Auto-open next step
+            hideAllOverlays();
+            // We can't show chapter grid yet because chapters haven't loaded.
+            // We'll rely on handleChaptersResponse to update grid, but we need to trigger the overlay.
+            // Since requestChapters is async, we can set a flag or just show it when response comes?
+            // Actually, showing an empty grid or loading state might be better,
+            // but let's wait for chapters to load.
+            // However, the user wants "auto-open".
+            // We can set a flag to open chapter grid when chapters arrive.
+            shouldOpenChapterGrid = true;
         }
 
         function showVersePreview(verse) {
@@ -1315,8 +1380,6 @@
         });
 
 
-
-        let pendingQuickSelection = null;
 
         function setCountdownPreset(time) {
             document.getElementById('customTime').value = time;
