@@ -109,7 +109,6 @@ var controlClients []*Client
 var controlClientsMutex sync.Mutex
 var bibleData BibleData
 var speakers []string
-var aiClient *AIClient
 
 var currentState struct {
 	Book    string
@@ -645,91 +644,6 @@ func handleControlWebSocket(w http.ResponseWriter, r *http.Request) {
 				}
 			}
 
-		case "transcript":
-			var req struct {
-				Type           string `json:"type"`
-				Text           string `json:"text"`
-				CurrentBook    string `json:"currentBook"`
-				CurrentChapter int    `json:"currentChapter"`
-				CurrentVerse   int    `json:"currentVerse"`
-			}
-			if err := json.Unmarshal(rawMsg, &req); err == nil {
-				// Broadcast transcript to other clients (so they can see what server hears)
-				transcriptMsg := struct {
-					Type string `json:"type"`
-					Text string `json:"text"`
-				}{
-					Type: "transcript",
-					Text: req.Text,
-				}
-				transcriptBytes, _ := json.Marshal(transcriptMsg)
-
-				controlClientsMutex.Lock()
-				for _, c := range controlClients {
-					if c != client {
-						// Copy the client pointer to use in the goroutine
-						targetClient := c
-						go func() {
-							// WriteMessage uses internal mutex, so this is safe concurrent access to the socket
-							targetClient.WriteMessage(websocket.TextMessage, transcriptBytes)
-						}()
-					}
-				}
-				controlClientsMutex.Unlock()
-
-				// Fill in context from global state if missing (e.g. from headless audio listener)
-				currentBook := req.CurrentBook
-				currentChapter := req.CurrentChapter
-				currentVerse := req.CurrentVerse
-
-				if currentBook == "" {
-					currentState.mu.Lock()
-					currentBook = currentState.Book
-					currentChapter = currentState.Chapter
-					currentVerse = currentState.Verse
-					currentState.mu.Unlock()
-				}
-
-				// Only process if text is significant enough (e.g., > 10 chars)
-				if len(req.Text) > 10 {
-					go func() {
-						suggestion, err := aiClient.AnalyzeTranscript(req.Text, currentBook, currentChapter, currentVerse)
-						if err != nil {
-							log.Printf("AI Error: %v", err)
-							return
-						}
-
-						if suggestion != nil && suggestion.Action != "none" {
-							// Send suggestion back to client
-							response := struct {
-								Type       string        `json:"type"`
-								Suggestion *AISuggestion `json:"suggestion"`
-							}{
-								Type:       "ai_suggestion",
-								Suggestion: suggestion,
-							}
-
-							log.Printf("AI Suggestion: %+v", suggestion)
-
-							responseBytes, _ := json.Marshal(response)
-
-							// Broadcast suggestion to all control clients
-							controlClientsMutex.Lock()
-							for _, c := range controlClients {
-								// Copy pointer for goroutine
-								targetClient := c
-								go func() {
-									if err := targetClient.WriteMessage(websocket.TextMessage, responseBytes); err != nil {
-										log.Printf("Error writing to client: %v", err)
-									}
-								}()
-							}
-							controlClientsMutex.Unlock()
-						}
-					}()
-				}
-			}
-
 		default:
 			// Handle regular message (speaker, show/hide, etc.)
 			var msg Message
@@ -753,15 +667,6 @@ func main() {
 
 	// Load speakers
 	loadSpeakers()
-
-	// Initialize AI Client
-	// Defaulting to llama3.2, user can change this if needed or we can make it configurable
-	aiClient = NewAIClient("http://localhost:11434/v1", "llama3.2")
-	if aiClient.CheckAvailability() {
-		log.Println("Local AI (Ollama) is available")
-	} else {
-		log.Println("Warning: Local AI (Ollama) not detected at http://localhost:11434")
-	}
 
 	// Serve static files
 	http.Handle("/", http.FileServer(http.Dir("./")))
