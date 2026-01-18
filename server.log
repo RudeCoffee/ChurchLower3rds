@@ -27,3 +27,7 @@ OBS Browser Source URL: http://localhost:8080/obs.html
 2026/01/18 12:09:33 Control client disconnected: websocket: close 1001 (going away)
 2026/01/18 12:10:30 Control client connected
 2026/01/18 12:10:30 Control client disconnected: websocket: close 1001 (going away)
+2026/01/18 12:17:15 Control client connected
+2026/01/18 12:17:46 Control client disconnected: websocket: close 1001 (going away)
+2026/01/18 12:18:32 Control client connected
+2026/01/18 12:18:34 Control client disconnected: websocket: close 1001 (going away)

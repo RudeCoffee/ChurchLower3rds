@@ -515,26 +515,6 @@
         });
 
         // Navigation functions
-        function previousVerse() {
-            console.log('previousVerse called:', {
-                selectedBook,
-                selectedChapter,
-                selectedVerse
-            });
-            
-            if (!selectedBook || selectedChapter === 0 || selectedVerse === 0) {
-                console.log('Cannot go to previous verse - missing selection');
-                return;
-            }
-            
-            if (selectedVerse > 1) {
-                // Previous verse in same chapter
-                console.log('Going to previous verse in same chapter');
-                selectVerse(selectedBook, selectedChapter, selectedVerse - 1);
-            } else {
-                console.log('At beginning of chapter');
-            }
-        }
 
         function nextVerse() {
             console.log('nextVerse called:', {
@@ -587,21 +567,15 @@
             const prevVerseNum = selectedVerse - 1;
             console.log('Attempting to go to previous verse:', prevVerseNum);
             
-            // Update the selection
-            selectedVerse = prevVerseNum;
-            currentVerse = prevVerseNum;
+            selectVerse(selectedBook, selectedChapter, prevVerseNum);
             
-            // Update the verse selector
-            const verseSelect = document.getElementById('verseSelect');
-            verseSelect.value = prevVerseNum;
-            
-            // Request the verse AND display it on OBS (not just preview)
+            // Also explicitly request display for OBS (since selectVerse only previews by default?
+            // Wait, logic says selectVerse -> requestVersePreview.
+            // But previousVerse originally called requestVerse AND requestVersePreview.
+            // If we reuse selectVerse, we should ensure requestVerse is called if we want to DISPLAY it.
+            // But "Previous" button usually implies navigation, not necessarily immediate display?
+            // The user said "moves to the next verse on obs.html", so they expect display update.
             requestVerse(selectedBook, selectedChapter, prevVerseNum);
-            
-            // Also get preview for the client interface
-            requestVersePreview(selectedBook, selectedChapter, prevVerseNum);
-            
-            updateNavigationButtons();
         }
 
         function selectVerse(book, chapter, verse) {
@@ -627,19 +601,19 @@
             const bookInput = document.getElementById('bookInput');
             bookInput.value = foundBook.name;
             
-            // Update the chapter selector
-            const chapterSelect = document.getElementById('chapterSelect');
-            chapterSelect.value = chapter;
-            chapterSelect.disabled = false;
-            
-            // Update the verse selector  
-            const verseSelect = document.getElementById('verseSelect');
-            verseSelect.value = verse;
-            verseSelect.disabled = false;
+            // Update triggers
+            document.getElementById('chapterTrigger').textContent = `Chapter ${chapter}`;
+            document.getElementById('verseTrigger').textContent = `Verse ${verse}`;
+
+            // Highlight in grids if they exist/are populated
+            updateChapterGrid(getChapterNumbersFromGrid());
+            updateVerseGrid(getVerseNumbersFromGrid());
             
             // Request and preview the verse
             console.log('Requesting verse preview for:', foundBook.abbrev || foundBook.name, chapter, verse);
             requestVersePreview(foundBook.abbrev || foundBook.name, chapter, verse);
+
+            updateNavigationButtons();
         }
 
         function extractBookFromName(verseName) {
@@ -660,15 +634,13 @@
                 bookInput.value = foundBook.name;
             }
             
-            // Update chapter selector
-            const chapterSelect = document.getElementById('chapterSelect');
-            chapterSelect.value = chapter;
-            chapterSelect.disabled = false;
+            // Update triggers
+            document.getElementById('chapterTrigger').textContent = `Chapter ${chapter}`;
+            document.getElementById('verseTrigger').textContent = `Verse ${verse}`;
             
-            // Update verse selector
-            const verseSelect = document.getElementById('verseSelect');
-            verseSelect.value = verse;
-            verseSelect.disabled = false;
+            // Update grid highlights
+            updateChapterGrid(getChapterNumbersFromGrid());
+            updateVerseGrid(getVerseNumbersFromGrid());
             
             // Update navigation buttons
             updateNavigationButtons();
@@ -1161,7 +1133,8 @@
             
             // Set chapter and verse when chapters load
             setTimeout(() => {
-                document.getElementById('chapterSelect').value = result.chapter;
+                // Update trigger instead of select
+                document.getElementById('chapterTrigger').textContent = `Chapter ${result.chapter}`;
                 selectedChapter = result.chapter;
                 currentChapter = result.chapter;
                 
@@ -1170,7 +1143,8 @@
                 
                 // Set verse when verses load
                 setTimeout(() => {
-                    document.getElementById('verseSelect').value = result.verse;
+                    // Update trigger instead of select
+                    document.getElementById('verseTrigger').textContent = `Verse ${result.verse}`;
                     selectedVerse = result.verse;
                     currentVerse = result.verse;
                     showVersePreview(result);
