@@ -383,6 +383,7 @@
         let selectedChapter = 0;
         let selectedVerse = 0;
         let currentView = 'books'; // books, chapters, verses, control
+        let isLive = false;
 
         // Data
         let books = [];
@@ -536,6 +537,7 @@
 
         function selectVerse(verse) {
             selectedVerse = verse;
+            isLive = false; // New selection is not yet live
             if (ws && ws.readyState === WebSocket.OPEN) {
                 ws.send(JSON.stringify({ type: 'preview_verse', book: selectedBook, chapter: selectedChapter, verse: verse }));
             }
@@ -549,13 +551,30 @@
             document.getElementById('preview-text').textContent = verseText;
             document.getElementById('bible-nav-title').textContent = verseRef;
 
-            document.getElementById('btn-display').style.display = 'block';
-            document.getElementById('btn-hide').style.display = 'none';
+            updateButtons();
 
             showBibleView('control');
 
             if(verseData.chapter) selectedChapter = verseData.chapter;
             if(verseData.verse) selectedVerse = verseData.verse;
+        }
+
+        function updateButtons() {
+            if (isLive) {
+                document.getElementById('btn-display').style.display = 'none';
+                document.getElementById('btn-hide').style.display = 'block';
+            } else {
+                document.getElementById('btn-display').style.display = 'block';
+                document.getElementById('btn-hide').style.display = 'none';
+            }
+        }
+
+        function debounceButtons() {
+             const btns = [document.getElementById('btn-display'), document.getElementById('btn-hide')];
+             btns.forEach(btn => btn.disabled = true);
+             setTimeout(() => {
+                 btns.forEach(btn => btn.disabled = false);
+             }, 500);
         }
 
         function showBibleView(viewName) {
@@ -576,6 +595,7 @@
         }
 
         function goBack() {
+            isLive = false; // Navigating away resets live expectation in UI
             if (currentView === 'control') {
                 showBibleView('verses');
                 document.getElementById('bible-nav-title').textContent = `${selectedBook} ${selectedChapter}`;
@@ -591,25 +611,26 @@
              if (ws && ws.readyState === WebSocket.OPEN) {
                 ws.send(JSON.stringify({ type: 'get_verse', book: selectedBook, chapter: selectedChapter, verse: selectedVerse }));
             }
-            document.getElementById('btn-display').style.display = 'none';
-            document.getElementById('btn-hide').style.display = 'block';
+            isLive = true;
+            updateButtons();
+            debounceButtons();
         }
 
         function hideVerse() {
              if (ws && ws.readyState === WebSocket.OPEN) {
                 ws.send(JSON.stringify({ type: 'bible', show: false }));
             }
-            document.getElementById('btn-display').style.display = 'block';
-            document.getElementById('btn-hide').style.display = 'none';
+            isLive = false;
+            updateButtons();
+            debounceButtons();
         }
 
         function nextVerse() {
              if (ws && ws.readyState === WebSocket.OPEN) {
                 ws.send(JSON.stringify({ type: 'get_next_verse', book: selectedBook, chapter: selectedChapter, verse: selectedVerse }));
             }
-            // Assume live update
-            document.getElementById('btn-display').style.display = 'none';
-            document.getElementById('btn-hide').style.display = 'block';
+            isLive = true;
+            updateButtons();
         }
 
         function prevVerse() {
@@ -619,9 +640,8 @@
                     ws.send(JSON.stringify({ type: 'get_verse', book: selectedBook, chapter: selectedChapter, verse: selectedVerse }));
                     ws.send(JSON.stringify({ type: 'preview_verse', book: selectedBook, chapter: selectedChapter, verse: selectedVerse }));
                 }
-                // Update UI state to Live
-                document.getElementById('btn-display').style.display = 'none';
-                document.getElementById('btn-hide').style.display = 'block';
+                isLive = true;
+                updateButtons();
             }
         }
 
@@ -764,6 +784,7 @@
                 selectedBook = bookName;
                 selectedChapter = res.chapter;
                 selectedVerse = res.verse;
+                isLive = false; // Search selection is preview only
 
                 if (ws && ws.readyState === WebSocket.OPEN) {
                     ws.send(JSON.stringify({
