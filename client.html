@@ -591,15 +591,19 @@
             currentVerse = verse;
             
             // Find the book data
-            const foundBook = books.find(b => b.abbrev === book || b.name === book);
-            if (!foundBook) {
-                console.error('Book not found:', book);
-                return;
-            }
+            let foundBook = books.find(b => b.abbrev === book || b.name === book);
             
             // Update the book input field
             const bookInput = document.getElementById('bookInput');
-            bookInput.value = foundBook.name;
+            if (foundBook) {
+                bookInput.value = foundBook.name;
+            } else {
+                console.warn('Book not found in list, using provided name:', book);
+                // Still proceed with update to ensure UI stays in sync even if book list isn't perfect
+                bookInput.value = book;
+                // Create a dummy foundBook to avoid null pointer if needed later
+                foundBook = { name: book, abbrev: book };
+            }
             
             // Update triggers
             document.getElementById('chapterTrigger').textContent = `Chapter ${chapter}`;
