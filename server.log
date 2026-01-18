@@ -1,0 +1,9 @@
+go: downloading github.com/gorilla/websocket v1.5.3
+2026/01/18 11:35:36 Loaded 66 Bible books
+2026/01/18 11:35:36 Loaded 9 speakers
+Server starting on :8080
+Local URL: http://localhost:8080/client.html
+Network URL: http://192.168.0.2:8080/client.html
+OBS Browser Source URL: http://localhost:8080/obs.html
+2026/01/18 11:35:40 Control client connected
+2026/01/18 11:35:42 Control client disconnected: websocket: close 1001 (going away)
