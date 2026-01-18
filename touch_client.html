@@ -1,0 +1,1010 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Touch Control - Church Lower 3rds</title>
+    <style>
+        :root {
+            --bg-color: #2b2b2b;
+            --sidebar-bg: #1e1e1e;
+            --container-bg: #3c3c3c;
+            --text-color: #e0e0e0;
+            --border-color: #555;
+            --accent-color: #007cba;
+            --accent-hover: #005a87;
+            --danger-bg: #dc3545;
+            --danger-hover: #c82333;
+            --success-bg: #28a745;
+            --grid-gap: 12px;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            background-color: var(--bg-color);
+            color: var(--text-color);
+            margin: 0;
+            padding: 0;
+            display: flex;
+            height: 100vh;
+            overflow: hidden;
+            user-select: none; /* Prevent text selection on touch */
+        }
+
+        /* Sidebar */
+        .sidebar {
+            width: 200px;
+            background-color: var(--sidebar-bg);
+            display: flex;
+            flex-direction: column;
+            border-right: 1px solid var(--border-color);
+            flex-shrink: 0;
+        }
+
+        .sidebar-item {
+            padding: 25px 20px;
+            cursor: pointer;
+            border-bottom: 1px solid #333;
+            font-size: 18px;
+            transition: background-color 0.2s;
+            display: flex;
+            align-items: center;
+        }
+
+        .sidebar-item:hover {
+            background-color: #333;
+        }
+
+        .sidebar-item.active {
+            background-color: var(--accent-color);
+            color: white;
+            font-weight: bold;
+        }
+
+        .sidebar-footer {
+            padding: 20px;
+            font-size: 12px;
+            color: #777;
+            text-align: center;
+        }
+
+        /* Main Content */
+        .main-content {
+            flex-grow: 1;
+            padding: 20px;
+            overflow-y: auto;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .section {
+            display: none;
+            flex-direction: column;
+            height: 100%;
+        }
+
+        .section.active {
+            display: flex;
+        }
+
+        h1, h2 {
+            margin-top: 0;
+            margin-bottom: 20px;
+        }
+
+        /* Grids */
+        .grid-container {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(100px, 1fr));
+            gap: var(--grid-gap);
+            padding-bottom: 20px;
+        }
+
+        .grid-btn {
+            background-color: var(--container-bg);
+            border: 1px solid var(--border-color);
+            color: var(--text-color);
+            padding: 20px 10px;
+            font-size: 18px;
+            border-radius: 8px;
+            cursor: pointer;
+            text-align: center;
+            transition: transform 0.1s, background-color 0.2s;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            min-height: 60px;
+        }
+
+        .grid-btn:active {
+            transform: scale(0.96);
+        }
+
+        .grid-btn.selected {
+            background-color: var(--accent-color);
+            color: white;
+            border-color: var(--accent-color);
+        }
+
+        .grid-btn-large {
+            font-size: 24px;
+            padding: 30px;
+        }
+
+        /* Navigation Header in Main Content */
+        .nav-header {
+            display: flex;
+            align-items: center;
+            margin-bottom: 20px;
+            border-bottom: 1px solid var(--border-color);
+            padding-bottom: 10px;
+        }
+
+        .back-btn {
+            background-color: transparent;
+            border: 1px solid var(--border-color);
+            color: var(--text-color);
+            padding: 10px 20px;
+            border-radius: 4px;
+            margin-right: 15px;
+            font-size: 16px;
+            cursor: pointer;
+        }
+
+        .nav-title {
+            font-size: 24px;
+            font-weight: bold;
+        }
+
+        .nav-breadcrumbs {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .breadcrumb-btn {
+            background-color: var(--container-bg);
+            border: 1px solid var(--border-color);
+            color: var(--text-color);
+            padding: 10px 15px;
+            border-radius: 4px;
+            font-size: 18px;
+            cursor: pointer;
+            font-weight: bold;
+        }
+
+        .breadcrumb-btn:hover {
+            border-color: var(--accent-color);
+            color: var(--accent-color);
+        }
+
+        /* Control View (Verse Display) */
+        .control-view {
+            display: flex;
+            flex-direction: column;
+            height: 100%;
+        }
+
+        .preview-box {
+            background-color: var(--container-bg);
+            padding: 20px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+            flex-grow: 1;
+            font-size: 24px;
+            line-height: 1.5;
+            overflow-y: auto;
+            border: 2px solid var(--border-color);
+        }
+
+        .preview-ref {
+            font-weight: bold;
+            color: var(--accent-color);
+            margin-bottom: 10px;
+            display: block;
+            font-size: 28px;
+        }
+
+        .control-actions {
+            display: grid;
+            grid-template-columns: 1fr 2fr 1fr;
+            gap: 20px;
+            margin-top: auto;
+            height: 100px;
+        }
+
+        .action-btn {
+            border: none;
+            border-radius: 8px;
+            color: white;
+            font-size: 24px;
+            font-weight: bold;
+            cursor: pointer;
+            transition: opacity 0.2s;
+        }
+
+        .action-btn:disabled {
+            background-color: #555 !important;
+            cursor: not-allowed;
+            opacity: 0.5;
+        }
+
+        .btn-display {
+            background-color: var(--accent-color);
+        }
+
+        .btn-hide {
+            background-color: var(--danger-bg);
+        }
+
+        .btn-nav {
+            background-color: var(--container-bg);
+            border: 1px solid var(--border-color);
+        }
+
+        /* Speaker Section */
+        .speaker-grid {
+            grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+        }
+
+        .input-group {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 20px;
+            margin-top: 20px;
+        }
+
+        input[type="text"], input[type="time"] {
+            flex-grow: 1;
+            padding: 15px;
+            font-size: 20px;
+            border-radius: 8px;
+            border: 1px solid var(--border-color);
+            background-color: var(--container-bg);
+            color: white;
+        }
+
+        /* Countdown Section */
+        .preset-grid {
+            grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+        }
+
+        /* Search Section */
+        .search-results {
+            margin-top: 20px;
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+
+        .search-result-item {
+            background-color: var(--container-bg);
+            padding: 15px;
+            border-radius: 8px;
+            cursor: pointer;
+            border: 1px solid transparent;
+        }
+
+        .search-result-item:hover {
+            border-color: var(--accent-color);
+        }
+
+        .search-result-ref {
+            font-size: 24px;
+            font-weight: bold;
+            margin-bottom: 8px;
+            color: var(--accent-color);
+        }
+
+        .search-result-text {
+            font-size: 20px;
+            color: #d0d0d0;
+            line-height: 1.4;
+        }
+
+        .status-bar {
+            position: fixed;
+            bottom: 10px;
+            right: 10px;
+            background: rgba(0,0,0,0.7);
+            padding: 5px 10px;
+            border-radius: 4px;
+            font-size: 12px;
+            pointer-events: none;
+        }
+        .status-connected { color: #28a745; }
+        .status-disconnected { color: #dc3545; }
+
+    </style>
+</head>
+<body>
+
+    <div class="sidebar">
+        <div class="sidebar-item active" onclick="switchTab('bible')">📖 Bible</div>
+        <div class="sidebar-item" onclick="switchTab('speaker')">🎤 Speaker</div>
+        <div class="sidebar-item" onclick="switchTab('countdown')">⏱️ Timer</div>
+        <div class="sidebar-item" onclick="switchTab('search')">🔍 Search</div>
+
+        <div class="sidebar-item" id="btn-fullscreen" onclick="enterFullScreen()" style="margin-top: auto;">⛶ Fullscreen</div>
+        <div class="sidebar-item" id="btn-exit-fullscreen" onclick="exitFullScreen()" style="display: none; margin-top: auto;">✕ Exit Fullscreen</div>
+
+        <div class="sidebar-footer">
+            Touch Client v1.0
+        </div>
+    </div>
+
+    <div class="main-content">
+        <!-- BIBLE SECTION -->
+        <div id="bible-section" class="section active">
+            <!-- Navigation Header (Hidden on root) -->
+            <div class="nav-header" id="bible-nav-header" style="display: none;">
+                <div class="nav-breadcrumbs" id="bible-breadcrumbs"></div>
+            </div>
+
+            <!-- Views -->
+            <div id="view-books" style="display: none; flex-direction: column; height: 100%;">
+                <div style="margin-bottom: 15px;">
+                    <input type="text" id="book-filter" placeholder="Filter Books..." oninput="filterBooks()" style="width: 100%; padding: 15px; font-size: 20px; border-radius: 8px; border: 1px solid var(--border-color); background-color: var(--container-bg); color: var(--text-color); box-sizing: border-box;">
+                </div>
+                <div id="book-grid-inner" class="grid-container" style="overflow-y: auto; flex-grow: 1;"></div>
+            </div>
+            <div id="view-chapters" class="grid-container" style="display: none;"></div>
+            <div id="view-verses" class="grid-container" style="display: none;"></div>
+
+            <!-- Control View -->
+            <div id="view-control" class="control-view" style="display: none;">
+                <div class="preview-box">
+                    <span class="preview-ref" id="preview-ref"></span>
+                    <div id="preview-text"></div>
+                </div>
+
+                <div id="next-verse-preview" class="preview-box" style="margin-top: 10px; font-size: 18px; color: #aaa; border-color: #555; display: none; flex-grow: 0.5;">
+                    <span class="preview-ref" id="next-preview-ref" style="font-size: 20px; color: #888;"></span>
+                    <div id="next-preview-text"></div>
+                </div>
+
+                <div class="control-actions">
+                    <button class="action-btn btn-nav" onclick="prevVerse()">← Prev</button>
+
+                    <div id="center-actions" style="grid-column: 2; display: flex; gap: 10px;">
+                        <button id="btn-display" class="action-btn btn-display" style="flex: 1;" onclick="displayVerse()">DISPLAY</button>
+                        <button id="btn-hide" class="action-btn btn-hide" style="flex: 1; display: none;" onclick="hideVerse()">HIDE</button>
+                    </div>
+
+                    <button class="action-btn btn-nav" onclick="nextVerse()">Next →</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- SPEAKER SECTION -->
+        <div id="speaker-section" class="section">
+            <h2>Select Speaker</h2>
+            <div id="speaker-grid" class="grid-container speaker-grid"></div>
+
+            <div class="input-group">
+                <input type="text" id="custom-speaker" placeholder="Or type name...">
+                <button id="btn-speaker-display" class="action-btn btn-display" style="width: 120px; font-size: 18px;" onclick="displayCustomSpeaker()">Display</button>
+                <button id="btn-speaker-hide" class="action-btn btn-hide" style="width: 120px; font-size: 18px; display: none;" onclick="hideSpeaker()">Hide</button>
+            </div>
+        </div>
+
+        <!-- COUNTDOWN SECTION -->
+        <div id="countdown-section" class="section">
+            <h2>Countdown Presets</h2>
+            <div class="grid-container preset-grid">
+                <div class="grid-btn grid-btn-large" onclick="setCountdownPreset('09:45')">9:45 AM</div>
+                <div class="grid-btn grid-btn-large" onclick="setCountdownPreset('11:15')">11:15 AM</div>
+                <div class="grid-btn grid-btn-large" onclick="setCountdownPreset('18:15')">6:15 PM</div>
+            </div>
+
+            <h2>Custom Time</h2>
+            <div class="input-group">
+                <input type="time" id="custom-time">
+                <button class="action-btn btn-display" style="width: 120px; font-size: 18px;" onclick="startCustomCountdown()">Start</button>
+            </div>
+
+             <div class="input-group">
+                <button class="action-btn btn-display" style="width: 100%; font-size: 18px; background-color: #ffc107; color: black;" onclick="showStartingSoon()">Show "Starting Soon"</button>
+            </div>
+
+            <button class="action-btn btn-hide" style="width: 100%; height: 60px;" onclick="stopCountdown()">Stop Countdown</button>
+        </div>
+
+        <!-- SEARCH SECTION -->
+        <div id="search-section" class="section">
+            <div class="input-group">
+                <input type="text" id="search-input" placeholder="Search scripture..." oninput="debounceSearch()">
+                <button class="action-btn btn-display" style="width: 100px; font-size: 18px;" onclick="searchBible()">Go</button>
+            </div>
+            <div id="search-results" class="search-results"></div>
+        </div>
+    </div>
+
+    <div id="status-display" class="status-bar">Connecting...</div>
+
+    <script>
+        // State
+        let ws;
+        let currentTab = 'bible';
+        let selectedBook = '';
+        let selectedChapter = 0;
+        let selectedVerse = 0;
+        let currentView = 'books'; // books, chapters, verses, control
+        let isLive = false;
+        let isOutputActive = false;
+        let isSpeakerLive = false;
+        let searchTimeout = null;
+
+        // Data
+        let books = [];
+        let speakers = [];
+
+        // Connection
+        function connect() {
+            const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+            const host = window.location.hostname;
+            const port = '8080';
+            ws = new WebSocket(`${protocol}//${host}:${port}/ws/control`);
+
+            ws.onopen = function () {
+                updateStatus('Connected', true);
+                requestBooks();
+                requestSpeakers();
+            };
+
+            ws.onclose = function () {
+                updateStatus('Disconnected', false);
+                setTimeout(connect, 3000);
+            };
+
+            ws.onmessage = function (event) {
+                const data = JSON.parse(event.data);
+                handleMessage(data);
+            };
+        }
+
+        function updateStatus(text, connected) {
+            const el = document.getElementById('status-display');
+            el.textContent = text;
+            el.className = 'status-bar ' + (connected ? 'status-connected' : 'status-disconnected');
+        }
+
+        function handleMessage(data) {
+            // console.log('Received:', data.type);
+            switch (data.type) {
+                case 'books_response':
+                    books = data.books;
+                    renderBookGrid(books);
+                    break;
+                case 'chapters_response':
+                    renderChapterGrid(data.chapters);
+                    break;
+                case 'verses_response':
+                    renderVerseGrid(data.verses);
+                    break;
+                case 'verse_preview':
+                case 'next_verse_response': // handle next verse nav result
+                case 'prev_verse_response': // handle prev verse nav result
+                    if (data.verse) {
+                        showControlView(data.verse);
+                    }
+                    break;
+                case 'next_verse_preview':
+                    if (data.verse) {
+                        showNextVersePreview(data.verse);
+                    } else {
+                        document.getElementById('next-verse-preview').style.display = 'none';
+                    }
+                    break;
+                case 'speakers_response':
+                    speakers = data.speakers;
+                    renderSpeakers(speakers);
+                    break;
+                case 'search_results':
+                    renderSearchResults(data.results);
+                    break;
+            }
+        }
+
+        // Navigation
+        function switchTab(tabId) {
+            currentTab = tabId;
+
+            // Sidebar active state
+            document.querySelectorAll('.sidebar-item').forEach(el => el.classList.remove('active'));
+            // Find the one with onclick matching or index... simplified:
+            const items = document.querySelectorAll('.sidebar-item');
+            if(tabId === 'bible') items[0].classList.add('active');
+            if(tabId === 'speaker') items[1].classList.add('active');
+            if(tabId === 'countdown') items[2].classList.add('active');
+            if(tabId === 'search') items[3].classList.add('active');
+
+            // Sections visibility
+            document.querySelectorAll('.section').forEach(el => el.classList.remove('active'));
+            document.getElementById(tabId + '-section').classList.add('active');
+        }
+
+        // Requests
+        function requestBooks() {
+             if (ws && ws.readyState === WebSocket.OPEN) {
+                ws.send(JSON.stringify({ type: 'get_books' }));
+            }
+        }
+
+        function requestSpeakers() {
+             if (ws && ws.readyState === WebSocket.OPEN) {
+                ws.send(JSON.stringify({ type: 'get_speakers' }));
+            }
+        }
+
+        // Bible Logic
+        function renderBookGrid(list) {
+            const grid = document.getElementById('book-grid-inner');
+            grid.innerHTML = '';
+            list.forEach(book => {
+                const btn = document.createElement('div');
+                btn.className = 'grid-btn';
+                btn.textContent = book;
+                btn.onclick = () => selectBook(book);
+                grid.appendChild(btn);
+            });
+            showBibleView('books');
+        }
+
+        function filterBooks() {
+            const filter = document.getElementById('book-filter').value.toLowerCase();
+            const filtered = books.filter(b => b.toLowerCase().includes(filter));
+            renderBookGrid(filtered);
+            // Ensure focus remains on input after re-render (though re-render doesn't touch input, safe)
+        }
+
+        function selectBook(book) {
+            selectedBook = book;
+            if (ws && ws.readyState === WebSocket.OPEN) {
+                ws.send(JSON.stringify({ type: 'get_chapters', book: book }));
+            }
+            showBibleView('chapters');
+        }
+
+        function renderChapterGrid(list) {
+            const grid = document.getElementById('view-chapters');
+            grid.innerHTML = '';
+            list.forEach(chapter => {
+                const btn = document.createElement('div');
+                btn.className = 'grid-btn grid-btn-large';
+                btn.textContent = chapter;
+                btn.onclick = () => selectChapter(chapter);
+                grid.appendChild(btn);
+            });
+        }
+
+        function selectChapter(chapter) {
+            selectedChapter = chapter;
+            if (ws && ws.readyState === WebSocket.OPEN) {
+                ws.send(JSON.stringify({ type: 'get_verses', book: selectedBook, chapter: chapter }));
+            }
+            showBibleView('verses');
+        }
+
+        function renderVerseGrid(list) {
+            const grid = document.getElementById('view-verses');
+            grid.innerHTML = '';
+            list.forEach(verse => {
+                const btn = document.createElement('div');
+                btn.className = 'grid-btn grid-btn-large';
+                btn.textContent = verse;
+                btn.onclick = () => selectVerse(verse);
+                grid.appendChild(btn);
+            });
+        }
+
+        function selectVerse(verse) {
+            selectedVerse = verse;
+            isLive = false; // New selection is not yet live
+            if (ws && ws.readyState === WebSocket.OPEN) {
+                ws.send(JSON.stringify({ type: 'preview_verse', book: selectedBook, chapter: selectedChapter, verse: verse }));
+            }
+        }
+
+        function requestNextVersePreview(book, chapter, verse) {
+            if (ws && ws.readyState === WebSocket.OPEN) {
+                ws.send(JSON.stringify({
+                    type: 'preview_next_verse',
+                    book: book,
+                    chapter: chapter,
+                    verse: verse
+                }));
+            }
+        }
+
+        function showNextVersePreview(verse) {
+             const verseRef = verse.name || `${verse.chapter}:${verse.verse}`;
+             document.getElementById('next-preview-ref').textContent = "Next: " + verseRef;
+             document.getElementById('next-preview-text').textContent = verse.text;
+             document.getElementById('next-verse-preview').style.display = 'block';
+        }
+
+        function showControlView(verseData) {
+            const verseRef = verseData.name || `${selectedBook} ${selectedChapter}:${selectedVerse}`;
+            const verseText = verseData.text;
+
+            document.getElementById('preview-ref').textContent = verseRef;
+            document.getElementById('preview-text').textContent = verseText;
+
+            // Clear previous next preview until loaded
+            document.getElementById('next-verse-preview').style.display = 'none';
+
+            updateButtons();
+
+            showBibleView('control');
+
+            if(verseData.chapter) selectedChapter = verseData.chapter;
+            if(verseData.verse) selectedVerse = verseData.verse;
+
+            // Request next verse preview
+            requestNextVersePreview(selectedBook, selectedChapter, selectedVerse);
+        }
+
+        function updateButtons() {
+            if (isLive) {
+                document.getElementById('btn-display').style.display = 'none';
+                document.getElementById('btn-hide').style.display = 'block';
+            } else if (isOutputActive) {
+                // Previewing a new verse, but output is active elsewhere
+                document.getElementById('btn-display').style.display = 'block';
+                document.getElementById('btn-hide').style.display = 'block';
+            } else {
+                // Previewing, output inactive
+                document.getElementById('btn-display').style.display = 'block';
+                document.getElementById('btn-hide').style.display = 'none';
+            }
+        }
+
+        function debounceButtons() {
+             const btns = [document.getElementById('btn-display'), document.getElementById('btn-hide')];
+             btns.forEach(btn => btn.disabled = true);
+             setTimeout(() => {
+                 btns.forEach(btn => btn.disabled = false);
+             }, 500);
+        }
+
+        function showBibleView(viewName) {
+            currentView = viewName;
+            document.getElementById('view-books').style.display = 'none';
+            document.getElementById('view-chapters').style.display = 'none';
+            document.getElementById('view-verses').style.display = 'none';
+            document.getElementById('view-control').style.display = 'none';
+
+            const displayType = (viewName === 'control' || viewName === 'books') ? 'flex' : 'grid';
+            document.getElementById('view-' + viewName).style.display = displayType;
+
+            updateBreadcrumbs(viewName);
+        }
+
+        function updateBreadcrumbs(viewName) {
+            const container = document.getElementById('bible-breadcrumbs');
+            const header = document.getElementById('bible-nav-header');
+            container.innerHTML = '';
+
+            if (viewName === 'books') {
+                header.style.display = 'none';
+                return;
+            }
+
+            header.style.display = 'flex';
+
+            // Back Button logic is now integrated into breadcrumbs
+
+            // Always add Book Button if not in books view
+            if (selectedBook) {
+                const bookBtn = document.createElement('div');
+                bookBtn.className = 'breadcrumb-btn';
+                bookBtn.textContent = selectedBook;
+                bookBtn.onclick = () => {
+                    isLive = false;
+                    showBibleView('books');
+                };
+                container.appendChild(bookBtn);
+            }
+
+            // Add Chapter Button if in verses or control view
+            if ((viewName === 'verses' || viewName === 'control') && selectedChapter) {
+                const chapBtn = document.createElement('div');
+                chapBtn.className = 'breadcrumb-btn';
+                chapBtn.textContent = 'Chapter ' + selectedChapter;
+                chapBtn.onclick = () => {
+                    isLive = false;
+                    showBibleView('chapters');
+                };
+                container.appendChild(chapBtn);
+            }
+
+            // Add Verse Button if in control view
+            if (viewName === 'control' && selectedVerse) {
+                const verseBtn = document.createElement('div');
+                verseBtn.className = 'breadcrumb-btn';
+                verseBtn.textContent = 'Verse ' + selectedVerse;
+                verseBtn.onclick = () => {
+                    isLive = false;
+                    showBibleView('verses');
+                };
+                container.appendChild(verseBtn);
+            }
+        }
+
+        function goBack() {
+            // Function kept for compatibility if needed, but UI now uses breadcrumbs.
+            // Mapping back button logic to breadcrumb levels
+            isLive = false;
+            if (currentView === 'control') {
+                showBibleView('verses');
+            } else if (currentView === 'verses') {
+                showBibleView('chapters');
+            } else if (currentView === 'chapters') {
+                showBibleView('books');
+            }
+        }
+
+        function displayVerse() {
+             if (ws && ws.readyState === WebSocket.OPEN) {
+                ws.send(JSON.stringify({ type: 'get_verse', book: selectedBook, chapter: selectedChapter, verse: selectedVerse }));
+            }
+            isLive = true;
+            isOutputActive = true;
+            updateButtons();
+            debounceButtons();
+        }
+
+        function hideVerse() {
+             if (ws && ws.readyState === WebSocket.OPEN) {
+                ws.send(JSON.stringify({ type: 'bible', show: false }));
+            }
+            isLive = false;
+            isOutputActive = false;
+            updateButtons();
+            debounceButtons();
+        }
+
+        function nextVerse() {
+             if (ws && ws.readyState === WebSocket.OPEN) {
+                ws.send(JSON.stringify({ type: 'get_next_verse', book: selectedBook, chapter: selectedChapter, verse: selectedVerse }));
+            }
+            isLive = true;
+            isOutputActive = true;
+            updateButtons();
+        }
+
+        function prevVerse() {
+             if (ws && ws.readyState === WebSocket.OPEN) {
+                ws.send(JSON.stringify({ type: 'get_prev_verse', book: selectedBook, chapter: selectedChapter, verse: selectedVerse }));
+            }
+            isLive = true;
+            isOutputActive = true;
+            updateButtons();
+        }
+
+        // Speaker Logic
+        function renderSpeakers(list) {
+            const grid = document.getElementById('speaker-grid');
+            grid.innerHTML = '';
+            list.forEach(speaker => {
+                const btn = document.createElement('div');
+                btn.className = 'grid-btn';
+                btn.textContent = speaker;
+                btn.onclick = () => {
+                    document.getElementById('custom-speaker').value = speaker;
+                };
+                grid.appendChild(btn);
+            });
+        }
+
+        function displayCustomSpeaker() {
+            const name = document.getElementById('custom-speaker').value;
+            if (name && ws && ws.readyState === WebSocket.OPEN) {
+                ws.send(JSON.stringify({
+                    type: 'speaker',
+                    speaker: name,
+                    show: true
+                }));
+                isSpeakerLive = true;
+                updateSpeakerButtons();
+                debounceSpeakerButtons();
+            }
+        }
+
+        function hideSpeaker() {
+             if (ws && ws.readyState === WebSocket.OPEN) {
+                ws.send(JSON.stringify({
+                    type: 'speaker',
+                    show: false
+                }));
+                isSpeakerLive = false;
+                updateSpeakerButtons();
+                debounceSpeakerButtons();
+            }
+        }
+
+        function updateSpeakerButtons() {
+            if (isSpeakerLive) {
+                document.getElementById('btn-speaker-display').style.display = 'none';
+                document.getElementById('btn-speaker-hide').style.display = 'block';
+            } else {
+                document.getElementById('btn-speaker-display').style.display = 'block';
+                document.getElementById('btn-speaker-hide').style.display = 'none';
+            }
+        }
+
+        function debounceSpeakerButtons() {
+             const btns = [document.getElementById('btn-speaker-display'), document.getElementById('btn-speaker-hide')];
+             btns.forEach(btn => btn.disabled = true);
+             setTimeout(() => {
+                 btns.forEach(btn => btn.disabled = false);
+             }, 500);
+        }
+
+        // Countdown Logic
+        function setCountdownPreset(time) {
+            document.getElementById('custom-time').value = time;
+            startCustomCountdown();
+        }
+
+        function startCustomCountdown() {
+            const timeInput = document.getElementById('custom-time').value;
+            if (!timeInput) return;
+
+            const [hours, minutes] = timeInput.split(':');
+            const targetTime = new Date();
+            targetTime.setHours(hours);
+            targetTime.setMinutes(minutes);
+            targetTime.setSeconds(0);
+            targetTime.setMilliseconds(0);
+
+            if (targetTime < new Date()) {
+                targetTime.setDate(targetTime.getDate() + 1);
+            }
+
+            if (ws && ws.readyState === WebSocket.OPEN) {
+                ws.send(JSON.stringify({
+                    type: 'countdown',
+                    targetTime: targetTime.getTime(),
+                    running: true
+                }));
+            }
+        }
+
+        function showStartingSoon() {
+             if (ws && ws.readyState === WebSocket.OPEN) {
+                ws.send(JSON.stringify({
+                    type: 'countdown',
+                    startingSoon: true
+                }));
+            }
+        }
+
+        function stopCountdown() {
+             if (ws && ws.readyState === WebSocket.OPEN) {
+                ws.send(JSON.stringify({
+                    type: 'countdown',
+                    running: false
+                }));
+            }
+        }
+
+        // Search Logic
+        function debounceSearch() {
+            clearTimeout(searchTimeout);
+            searchTimeout = setTimeout(() => {
+                searchBible();
+            }, 300);
+        }
+
+        function searchBible() {
+            const query = document.getElementById('search-input').value;
+            if (query && ws && ws.readyState === WebSocket.OPEN) {
+                ws.send(JSON.stringify({
+                    type: 'search',
+                    query: query
+                }));
+            }
+        }
+
+        function renderSearchResults(results) {
+            const container = document.getElementById('search-results');
+            container.innerHTML = '';
+
+            if (!results || results.length === 0) {
+                container.innerHTML = '<div style="padding:15px; color:#888;">No results found.</div>';
+                return;
+            }
+
+            results.forEach(res => {
+                const div = document.createElement('div');
+                div.className = 'search-result-item';
+                const ref = res.name || `${res.chapter}:${res.verse}`;
+
+                const refDiv = document.createElement('div');
+                refDiv.className = 'search-result-ref';
+                refDiv.textContent = ref;
+
+                const textDiv = document.createElement('div');
+                textDiv.className = 'search-result-text';
+                textDiv.textContent = res.text;
+
+                div.appendChild(refDiv);
+                div.appendChild(textDiv);
+
+                div.onclick = () => selectSearchResult(res);
+                container.appendChild(div);
+            });
+        }
+
+        function selectSearchResult(res) {
+            let bookName = '';
+            if (res.name) {
+                const parts = res.name.split(' ');
+                if (parts.length >= 2) {
+                    bookName = parts.slice(0, -1).join(' ');
+                }
+            }
+
+            if (bookName) {
+                selectedBook = bookName;
+                selectedChapter = res.chapter;
+                selectedVerse = res.verse;
+                isLive = false; // Search selection is preview only
+
+                if (ws && ws.readyState === WebSocket.OPEN) {
+                    ws.send(JSON.stringify({
+                        type: 'preview_verse',
+                        book: selectedBook,
+                        chapter: selectedChapter,
+                        verse: selectedVerse
+                    }));
+                }
+
+                switchTab('bible');
+            }
+        }
+
+        // Fullscreen Logic
+        function enterFullScreen() {
+            const elem = document.documentElement;
+            if (elem.requestFullscreen) {
+                elem.requestFullscreen();
+            } else if (elem.webkitRequestFullscreen) { /* Safari */
+                elem.webkitRequestFullscreen();
+            } else if (elem.msRequestFullscreen) { /* IE11 */
+                elem.msRequestFullscreen();
+            }
+        }
+
+        function exitFullScreen() {
+            if (document.exitFullscreen) {
+                document.exitFullscreen();
+            } else if (document.webkitExitFullscreen) { /* Safari */
+                document.webkitExitFullscreen();
+            } else if (document.msExitFullscreen) { /* IE11 */
+                document.msExitFullscreen();
+            }
+        }
+
+        function updateFullScreenButtons() {
+            const isFullScreen = document.fullscreenElement || document.webkitFullscreenElement || document.msFullscreenElement;
+            if (isFullScreen) {
+                document.getElementById('btn-fullscreen').style.display = 'none';
+                document.getElementById('btn-exit-fullscreen').style.display = 'flex';
+            } else {
+                document.getElementById('btn-fullscreen').style.display = 'flex';
+                document.getElementById('btn-exit-fullscreen').style.display = 'none';
+            }
+        }
+
+        document.addEventListener('fullscreenchange', updateFullScreenButtons);
+        document.addEventListener('webkitfullscreenchange', updateFullScreenButtons);
+        document.addEventListener('msfullscreenchange', updateFullScreenButtons);
+
+        // Init
+        connect();
+    </script>
+</body>
+</html>
