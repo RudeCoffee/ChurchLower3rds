@@ -1,4 +1,5 @@
 <!DOCTYPE html>
+
 <head>
     <title>Church Lower 3rds Control</title>
     <style>
@@ -43,31 +44,40 @@
             color: var(--text-color);
             transition: background-color 0.3s, color 0.3s;
         }
+
         .container {
             background: var(--container-bg);
             padding: 20px;
             border-radius: 8px;
-            box-shadow: 0 2px 4px rgba(0,0,0,0.3);
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
             margin-bottom: 20px;
             transition: background-color 0.3s, transform 0.2s;
         }
+
         .container:hover {
             transform: translateY(-2px);
         }
-        h1, h2 {
+
+        h1,
+        h2 {
             color: var(--text-color);
             margin-top: 0;
         }
+
         .form-group {
             margin-bottom: 15px;
         }
+
         label {
             display: block;
             margin-bottom: 5px;
             font-weight: bold;
             color: var(--text-color);
         }
-        input, textarea, select {
+
+        input,
+        textarea,
+        select {
             width: 100%;
             padding: 8px;
             border: 1px solid var(--border-color);
@@ -78,12 +88,15 @@
             color: var(--text-color);
             transition: background-color 0.3s, color 0.3s, border-color 0.3s;
         }
+
         .verse-selector {
-            display: flex;
-            flex-direction: column;
+            display: grid;
+            grid-template-columns: 2fr 1fr 1fr;
             gap: 10px;
             margin-bottom: 15px;
+            position: relative;
         }
+
         .verse-navigation {
             display: grid;
             grid-template-columns: 1fr auto auto auto auto 1fr;
@@ -99,13 +112,25 @@
         }
 
         @keyframes flash {
-            0% { background-color: var(--button-bg); }
-            50% { background-color: var(--success-bg); transform: scale(1.05); }
-            100% { background-color: var(--button-bg); }
+            0% {
+                background-color: var(--button-bg);
+            }
+
+            50% {
+                background-color: var(--success-bg);
+                transform: scale(1.05);
+            }
+
+            100% {
+                background-color: var(--button-bg);
+            }
         }
+
         .flash-alert {
-            animation: flash 1s 3; /* Flash 3 times over 3 seconds */
+            animation: flash 1s 3;
+            /* Flash 3 times over 3 seconds */
         }
+
         .nav-button {
             background-color: var(--button-bg);
             color: white;
@@ -116,13 +141,16 @@
             font-size: 14px;
             min-width: 80px;
         }
+
         .nav-button:hover {
             background-color: var(--button-hover);
         }
+
         .nav-button:disabled {
             background-color: #6c757d;
             cursor: not-allowed;
         }
+
         .theme-toggle {
             position: fixed;
             top: 20px;
@@ -136,15 +164,18 @@
             font-size: 16px;
             width: 50px;
             height: 50px;
-            box-shadow: 0 2px 4px rgba(0,0,0,0.3);
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
             transition: background-color 0.3s;
         }
+
         .theme-toggle:hover {
             background-color: var(--button-hover);
         }
+
         .autocomplete-container {
             position: relative;
         }
+
         .autocomplete-dropdown {
             position: absolute;
             top: 100%;
@@ -159,19 +190,23 @@
             display: none;
             transition: background-color 0.3s;
         }
+
         .autocomplete-item {
             padding: 8px;
             cursor: pointer;
             border-bottom: 1px solid var(--border-color);
             color: var(--text-color);
         }
+
         .autocomplete-item:hover {
             background-color: var(--preview-bg);
         }
+
         .autocomplete-item.selected {
             background-color: var(--button-bg);
             color: white;
         }
+
         button {
             background-color: var(--button-bg);
             color: white;
@@ -183,35 +218,43 @@
             margin-right: 10px;
             transition: background-color 0.3s;
         }
+
         button:hover {
             background-color: var(--button-hover);
         }
+
         button:disabled {
             background-color: #6c757d;
             cursor: not-allowed;
         }
+
         button.hide {
             background-color: var(--danger-bg);
         }
+
         button.hide:hover {
             background-color: var(--danger-hover);
         }
+
         .status {
             padding: 10px;
             border-radius: 4px;
             margin-bottom: 20px;
             transition: background-color 0.3s, color 0.3s;
         }
+
         .status.connected {
             background-color: var(--success-bg);
             color: var(--text-color);
             border: 1px solid var(--success-border);
         }
+
         .status.disconnected {
             background-color: var(--danger-bg);
             color: white;
             border: 1px solid var(--danger-hover);
         }
+
         .verse-preview {
             background-color: var(--preview-bg);
             border: 1px solid var(--border-color);
@@ -221,10 +264,12 @@
             display: none;
             transition: background-color 0.3s, border-color 0.3s;
         }
+
         .verse-preview h3 {
             margin-top: 0;
             color: var(--button-bg);
         }
+
         .next-verse-preview {
             background-color: var(--container-bg);
             border: 1px solid #555;
@@ -235,18 +280,22 @@
             transition: background-color 0.3s, border-color 0.3s;
             opacity: 0.8;
         }
+
         .next-verse-preview h4 {
             margin: 0 0 8px 0;
             font-size: 0.9em;
         }
+
         .verse-text {
             font-style: italic;
             line-height: 1.5;
             color: var(--text-color);
         }
+
         .verse-text .word {
             transition: background-color 0.3s, color 0.3s;
         }
+
         .search-results {
             max-height: 300px;
             overflow-y: auto;
@@ -256,30 +305,69 @@
             background-color: var(--container-bg);
             transition: background-color 0.3s, border-color 0.3s;
         }
+
         .search-result {
             padding: 10px;
             border-bottom: 1px solid var(--border-color);
             cursor: pointer;
             color: var(--text-color);
         }
+
         .search-result:hover {
             background-color: var(--preview-bg);
         }
+
         .search-result:last-child {
             border-bottom: none;
         }
+
         .verse-reference {
             font-weight: bold;
             color: var(--button-bg);
         }
-        .selection-grid {
+
+        .selector-container {
+            /* position: relative; Removed to allow overlay to span full width of verse-selector */
+        }
+
+        .selector-trigger {
+            width: 100%;
+            padding: 8px;
+            border: 1px solid var(--border-color);
+            border-radius: 4px;
+            font-size: 14px;
+            box-sizing: border-box;
+            background-color: var(--input-bg);
+            color: var(--text-color);
+            cursor: pointer;
+            min-height: 35px;
             display: flex;
+            align-items: center;
+        }
+
+        .selection-grid {
+            display: none;
+            position: absolute;
+            top: 100%;
+            left: 0;
+            right: 0;
+            z-index: 2001;
+            background: var(--dropdown-bg);
+            border: 1px solid var(--border-color);
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.3);
             flex-wrap: wrap;
             gap: 8px;
-            margin-top: 10px;
-            max-height: 300px;
+            padding: 10px;
+            max-height: 60vh;
             overflow-y: auto;
+            border-radius: 4px;
+            margin-top: 5px;
         }
+
+        .selection-grid.show {
+            display: flex;
+        }
+
         .grid-button {
             padding: 10px;
             border: 1px solid var(--border-color);
@@ -292,44 +380,59 @@
             color: var(--text-color);
             transition: background-color 0.3s, color 0.3s;
         }
+
         .grid-button:hover {
             background-color: var(--preview-bg);
         }
+
         .grid-button.selected {
             background-color: var(--button-bg);
             color: white;
             border-color: var(--button-bg);
         }
+
+        .grid-button.highlighted {
+            background-color: var(--preview-bg);
+            border-color: var(--button-bg);
+            outline: 2px solid var(--button-bg);
+        }
     </style>
 </head>
+
 <body class="light-mode">
     <button class="theme-toggle" onclick="toggleTheme()" title="Toggle Dark Mode">🌙</button>
-    
+
     <div class="status" id="status">Connecting...</div>
-    
-    <div class="container">
+
+    <div class="container" style="position: relative; z-index: 10;">
         <h1>Church Lower 3rds Control</h1>
-        
+
         <h2>Bible Verse Display</h2>
         <div class="verse-selector">
-            <div>
+            <div class="selector-container">
                 <label for="bookInput">Book</label>
-                <input type="text" id="bookInput" placeholder="Type book name..." autocomplete="off">
+                <input type="text" id="bookInput" placeholder="Type book name..." autocomplete="off"
+                    onfocus="showOverlay('bookGrid')" onclick="showOverlay('bookGrid')"
+                    onkeydown="handleBookKeydown(event)">
                 <div id="bookGrid" class="selection-grid"></div>
             </div>
-            
-            <div>
+
+            <div class="selector-container">
                 <label>Chapter</label>
+                <div class="selector-trigger" id="chapterTrigger" onclick="showOverlay('chapterGrid')" tabindex="0"
+                    onkeydown="handleChapterKeydown(event)">Select Chapter</div>
                 <div id="chapterGrid" class="selection-grid"></div>
             </div>
-            
-            <div>
+
+            <div class="selector-container">
                 <label>Verse</label>
+                <div class="selector-trigger" id="verseTrigger" onclick="showOverlay('verseGrid')" tabindex="0"
+                    onkeydown="handleVerseKeydown(event)">Select Verse</div>
                 <div id="verseGrid" class="selection-grid"></div>
             </div>
         </div>
-        
-        
+
+
         <div class="verse-navigation">
             <div></div>
             <button class="nav-button" onclick="previousVerse()" id="prevBtn" disabled>← Previous</button>
@@ -337,18 +440,19 @@
             <button class="nav-button" onclick="nextVerse()" id="nextBtn" disabled>Next →</button>
             <div></div>
         </div>
-        
+
         <div class="verse-preview" id="versePreview">
             <h3 id="verseReference"></h3>
             <div class="verse-text" id="verseText"></div>
         </div>
-        
+
         <div class="next-verse-preview" id="nextVersePreview" style="display: none;">
             <h4 style="color: #888; margin-bottom: 10px;">Next Verse Preview:</h4>
             <h4 id="nextVerseReference" style="color: #aaa; font-size: 0.9em;"></h4>
-            <div class="verse-text" id="nextVerseText" style="color: #999; font-size: 0.85em; font-style: italic;"></div>
+            <div class="verse-text" id="nextVerseText" style="color: #999; font-size: 0.85em; font-style: italic;">
+            </div>
         </div>
-        
+
         <button onclick="displayVerse()" id="displayBtn" disabled>Display Verse</button>
         <button onclick="hideVerse()" class="hide">Hide Verse</button>
     </div>
@@ -359,7 +463,8 @@
             <div class="form-group">
                 <label for="speakerInput">Speaker Name</label>
                 <div class="autocomplete-container">
-                    <input type="text" id="speakerInput" placeholder="Enter speaker name" oninput="filterSpeakers()" onkeydown="handleSpeakerKeydown(event)">
+                    <input type="text" id="speakerInput" placeholder="Enter speaker name" oninput="filterSpeakers()"
+                        onkeydown="handleSpeakerKeydown(event)">
                     <div class="autocomplete-dropdown" id="speakerDropdown"></div>
                 </div>
             </div>
@@ -384,7 +489,7 @@
             <button onclick="stopCountdown()" class="hide">Stop Countdown</button>
         </div>
     </div>
-    
+
     <div class="container">
         <h2>Text Search</h2>
         <div class="form-group">
@@ -400,22 +505,69 @@
         let selectedChapter = 0;
         let selectedVerse = 0;
         let currentAutocompleteIndex = -1;
+        let currentBookIndex = -1;
+        let currentChapterIndex = -1;
+        let currentVerseIndex = -1;
         let books = [];
         let speakers = [];
         let currentSpeakerIndex = -1;
         let currentBookData = null;
         let currentVerseData = null;
-        
+
         // Additional variables for consistency
         let currentBook = '';
         let currentChapter = 0;
         let currentVerse = 0;
 
+        let shouldOpenChapterGrid = false;
+        let shouldOpenVerseGrid = false;
+
+        // Overlay Management
+        function showOverlay(id) {
+            hideAllOverlays();
+            const overlay = document.getElementById(id);
+            if (overlay) {
+                overlay.classList.add('show');
+
+                // Focus the trigger if applicable to allow keyboard nav immediately
+                if (id === 'chapterGrid') {
+                    document.getElementById('chapterTrigger').focus();
+                } else if (id === 'verseGrid') {
+                    document.getElementById('verseTrigger').focus();
+                } else if (id === 'bookGrid') {
+                    // Book input already has focus logic
+                }
+            }
+        }
+
+        function hideOverlay(id) {
+            const overlay = document.getElementById(id);
+            if (overlay) {
+                overlay.classList.remove('show');
+            }
+        }
+
+        function hideAllOverlays() {
+            const overlays = document.querySelectorAll('.selection-grid');
+            overlays.forEach(overlay => overlay.classList.remove('show'));
+        }
+
+        // Close overlays when clicking outside
+        document.addEventListener('click', function (event) {
+            const target = event.target;
+
+            // Check if click is inside a selector container
+            const container = target.closest('.selector-container');
+            if (!container) {
+                hideAllOverlays();
+            }
+        });
+
         // Theme toggle function
         function toggleTheme() {
             const body = document.body;
             const themeToggle = document.querySelector('.theme-toggle');
-            
+
             if (body.classList.contains('light-mode')) {
                 body.classList.remove('light-mode');
                 themeToggle.textContent = '☀️';
@@ -430,11 +582,11 @@
         }
 
         // Load saved theme on page load
-        window.addEventListener('DOMContentLoaded', function() {
+        window.addEventListener('DOMContentLoaded', function () {
             const savedTheme = localStorage.getItem('theme') || 'light';
             const body = document.body;
             const themeToggle = document.querySelector('.theme-toggle');
-            
+
             if (savedTheme === 'dark') {
                 body.classList.remove('light-mode');
                 themeToggle.textContent = '☀️';
@@ -447,26 +599,6 @@
         });
 
         // Navigation functions
-        function previousVerse() {
-            console.log('previousVerse called:', {
-                selectedBook,
-                selectedChapter,
-                selectedVerse
-            });
-            
-            if (!selectedBook || selectedChapter === 0 || selectedVerse === 0) {
-                console.log('Cannot go to previous verse - missing selection');
-                return;
-            }
-            
-            if (selectedVerse > 1) {
-                // Previous verse in same chapter
-                console.log('Going to previous verse in same chapter');
-                selectVerse(selectedBook, selectedChapter, selectedVerse - 1);
-            } else {
-                console.log('At beginning of chapter');
-            }
-        }
 
         function nextVerse() {
             console.log('nextVerse called:', {
@@ -474,15 +606,15 @@
                 selectedChapter,
                 selectedVerse
             });
-            
+
             if (!selectedBook || selectedChapter === 0 || selectedVerse === 0) {
                 console.log('Cannot go to next verse - missing selection');
                 return;
             }
-            
+
             // Request the next verse (server will handle chapter boundaries)
             console.log('Requesting next verse from server');
-            
+
             // Send a special request to get the next verse
             if (ws && ws.readyState === WebSocket.OPEN) {
                 ws.send(JSON.stringify({
@@ -509,69 +641,67 @@
                 selectedChapter,
                 selectedVerse
             });
-            
+
             if (!selectedBook || selectedChapter === 0 || selectedVerse <= 1) {
                 console.log('Cannot go to previous verse - at beginning or missing selection');
                 return;
             }
-            
+
             // Go to previous verse
             const prevVerseNum = selectedVerse - 1;
             console.log('Attempting to go to previous verse:', prevVerseNum);
-            
-            // Update the selection
-            selectedVerse = prevVerseNum;
-            currentVerse = prevVerseNum;
-            
-            // Update the verse selector
-            const verseSelect = document.getElementById('verseSelect');
-            verseSelect.value = prevVerseNum;
-            
-            // Request the verse AND display it on OBS (not just preview)
+
+            selectVerse(selectedBook, selectedChapter, prevVerseNum);
+
+            // Also explicitly request display for OBS (since selectVerse only previews by default? 
+            // Wait, logic says selectVerse -> requestVersePreview. 
+            // But previousVerse originally called requestVerse AND requestVersePreview.
+            // If we reuse selectVerse, we should ensure requestVerse is called if we want to DISPLAY it.
+            // But "Previous" button usually implies navigation, not necessarily immediate display?
+            // The user said "moves to the next verse on obs.html", so they expect display update.
             requestVerse(selectedBook, selectedChapter, prevVerseNum);
-            
-            // Also get preview for the client interface
-            requestVersePreview(selectedBook, selectedChapter, prevVerseNum);
-            
-            updateNavigationButtons();
         }
 
         function selectVerse(book, chapter, verse) {
             console.log('selectVerse called:', { book, chapter, verse });
-            
+
             selectedBook = book;
             selectedChapter = chapter;
             selectedVerse = verse;
-            
+
             // Update global current variables
             currentBook = book;
             currentChapter = chapter;
             currentVerse = verse;
-            
+
             // Find the book data
-            const foundBook = books.find(b => b.abbrev === book || b.name === book);
-            if (!foundBook) {
-                console.error('Book not found:', book);
-                return;
-            }
-            
+            let foundBook = books.find(b => b.abbrev === book || b.name === book);
+
             // Update the book input field
             const bookInput = document.getElementById('bookInput');
-            bookInput.value = foundBook.name;
-            
-            // Update the chapter selector
-            const chapterSelect = document.getElementById('chapterSelect');
-            chapterSelect.value = chapter;
-            chapterSelect.disabled = false;
-            
-            // Update the verse selector  
-            const verseSelect = document.getElementById('verseSelect');
-            verseSelect.value = verse;
-            verseSelect.disabled = false;
-            
+            if (foundBook) {
+                bookInput.value = foundBook.name;
+            } else {
+                console.warn('Book not found in list, using provided name:', book);
+                // Still proceed with update to ensure UI stays in sync even if book list isn't perfect
+                bookInput.value = book;
+                // Create a dummy foundBook to avoid null pointer if needed later
+                foundBook = { name: book, abbrev: book };
+            }
+
+            // Update triggers
+            document.getElementById('chapterTrigger').textContent = `Chapter ${chapter}`;
+            document.getElementById('verseTrigger').textContent = `Verse ${verse}`;
+
+            // Highlight in grids if they exist/are populated
+            updateChapterGrid(getChapterNumbersFromGrid());
+            updateVerseGrid(getVerseNumbersFromGrid());
+
             // Request and preview the verse
             console.log('Requesting verse preview for:', foundBook.abbrev || foundBook.name, chapter, verse);
             requestVersePreview(foundBook.abbrev || foundBook.name, chapter, verse);
+
+            updateNavigationButtons();
         }
 
         function extractBookFromName(verseName) {
@@ -591,17 +721,15 @@
                 const bookInput = document.getElementById('bookInput');
                 bookInput.value = foundBook.name;
             }
-            
-            // Update chapter selector
-            const chapterSelect = document.getElementById('chapterSelect');
-            chapterSelect.value = chapter;
-            chapterSelect.disabled = false;
-            
-            // Update verse selector
-            const verseSelect = document.getElementById('verseSelect');
-            verseSelect.value = verse;
-            verseSelect.disabled = false;
-            
+
+            // Update triggers
+            document.getElementById('chapterTrigger').textContent = `Chapter ${chapter}`;
+            document.getElementById('verseTrigger').textContent = `Verse ${verse}`;
+
+            // Update grid highlights
+            updateChapterGrid(getChapterNumbersFromGrid());
+            updateVerseGrid(getVerseNumbersFromGrid());
+
             // Update navigation buttons
             updateNavigationButtons();
         }
@@ -610,13 +738,13 @@
             const prevBtn = document.getElementById('prevBtn');
             const nextBtn = document.getElementById('nextBtn');
             const currentRef = document.getElementById('currentVerseRef');
-            
+
             console.log('updateNavigationButtons called:', {
                 selectedBook,
                 selectedChapter,
                 selectedVerse
             });
-            
+
             if (!selectedBook || selectedChapter === 0 || selectedVerse === 0) {
                 prevBtn.disabled = true;
                 nextBtn.disabled = true;
@@ -624,25 +752,25 @@
                 console.log('Navigation buttons disabled - missing data');
                 return;
             }
-            
+
             // Update the current reference display
             currentRef.textContent = `Current: ${selectedBook} ${selectedChapter}:${selectedVerse}`;
-            
+
             // Enable/disable buttons based on simple logic
             const canGoPrev = selectedVerse > 1;
             prevBtn.disabled = !canGoPrev;
-            
+
             // Update button text to show next/previous verse numbers
             if (canGoPrev) {
                 prevBtn.textContent = `← ${selectedBook} ${selectedChapter}:${selectedVerse - 1}`;
             } else {
                 prevBtn.textContent = '← Previous Verse';
             }
-            
+
             // For next button, always enable it and show next verse number
             nextBtn.disabled = false;
             nextBtn.textContent = `${selectedBook} ${selectedChapter}:${selectedVerse + 1} →`;
-            
+
             console.log('Navigation buttons updated:', {
                 canGoPrev,
                 prevDisabled: prevBtn.disabled,
@@ -656,30 +784,30 @@
             const host = window.location.hostname;
             const port = '8080'; // Hardcoded port since server runs on 8080
             ws = new WebSocket(`${protocol}//${host}:${port}/ws/control`);
-            
-            ws.onopen = function() {
+
+            ws.onopen = function () {
                 console.log('Connected to server');
                 document.getElementById('status').className = 'status connected';
                 document.getElementById('status').textContent = 'Connected to server';
-                
+
                 // Load initial book list
                 requestBooks();
-                
+
                 // Load speakers list
                 requestSpeakers();
             };
-            
-            ws.onclose = function() {
+
+            ws.onclose = function () {
                 console.log('Disconnected from server');
                 document.getElementById('status').className = 'status disconnected';
                 document.getElementById('status').textContent = 'Disconnected from server - Retrying...';
                 setTimeout(connect, 3000);
             };
-            
-            ws.onmessage = function(event) {
+
+            ws.onmessage = function (event) {
                 const data = JSON.parse(event.data);
-                
-                switch(data.type) {
+
+                switch (data.type) {
                     case 'books_response':
                         handleBooksResponse(data.books);
                         break;
@@ -719,7 +847,7 @@
                             // Successfully got next verse, update our current selection
                             const verse = data.verse;
                             console.log('Received next verse:', verse);
-                            
+
                             // Update selection variables
                             selectedBook = extractBookFromName(verse.name);
                             selectedChapter = verse.chapter;
@@ -727,13 +855,13 @@
                             currentBook = selectedBook;
                             currentChapter = selectedChapter;
                             currentVerse = selectedVerse;
-                            
+
                             // Update UI selectors
                             updateUIForNewVerse(selectedBook, selectedChapter, selectedVerse);
-                            
+
                             // Show verse preview
                             showVersePreview(verse);
-                            
+
                             console.log('Navigation successful to:', selectedBook, selectedChapter, selectedVerse);
                         } else {
                             console.log('No next verse available (end of book?)');
@@ -818,32 +946,15 @@
 
         function handleBooksResponse(bookList) {
             books = bookList;
+            currentBookIndex = -1;
             updateBookGrid(bookList);
-            
-            // Handle pending quick selection
-            if (pendingQuickSelection) {
-                const { bookName, chapter, verse } = pendingQuickSelection;
-                
-                // Find matching book (case insensitive, flexible matching)
-                const matchedBook = bookList.find(book => 
-                    book.toLowerCase().includes(bookName.toLowerCase()) ||
-                    bookName.toLowerCase().includes(book.toLowerCase())
-                );
-                
-                if (matchedBook) {
-                    selectBook(matchedBook);
-                    pendingQuickSelection = { ...pendingQuickSelection, bookName: matchedBook };
-                } else {
-                    pendingQuickSelection = null;
-                }
-            }
         }
 
         function updateBookGrid(bookList) {
             const grid = document.getElementById('bookGrid');
             grid.innerHTML = '';
-            
-            bookList.forEach(book => {
+
+            bookList.forEach((book, index) => {
                 const button = document.createElement('div');
                 button.className = 'grid-button';
                 if (book === selectedBook) {
@@ -851,34 +962,149 @@
                 }
                 button.textContent = book;
                 button.onclick = () => selectBook(book);
+                button.dataset.index = index;
                 grid.appendChild(button);
+            });
+        }
+
+        function navigateGrid(gridId, currentIndex, direction) {
+            const grid = document.getElementById(gridId);
+            const buttons = Array.from(grid.getElementsByClassName('grid-button'));
+            if (buttons.length === 0) return currentIndex;
+
+            // Ensure grid is visible to calculate positions
+            if (!grid.classList.contains('show')) return currentIndex;
+
+            // Initialize if needed
+            if (currentIndex < 0) {
+                if (direction === 'down' || direction === 'right') return 0;
+                if (direction === 'up' || direction === 'left') return buttons.length - 1;
+                return 0;
+            }
+
+            if (direction === 'right') {
+                return Math.min(currentIndex + 1, buttons.length - 1);
+            } else if (direction === 'left') {
+                return Math.max(currentIndex - 1, 0);
+            }
+
+            // Up/Down Visual Navigation
+            const currentBtn = buttons[currentIndex];
+            const currentRect = currentBtn.getBoundingClientRect();
+            const currentCenter = currentRect.left + (currentRect.width / 2);
+
+            // Group buttons by row (using top position with small tolerance)
+            const tolerance = 5;
+            const rows = [];
+            let currentRow = [];
+            let currentTop = -1;
+
+            buttons.forEach((btn, index) => {
+                const rect = btn.getBoundingClientRect();
+                if (currentTop === -1 || Math.abs(rect.top - currentTop) <= tolerance) {
+                    currentRow.push({ index, btn, rect });
+                    if (currentTop === -1) currentTop = rect.top;
+                } else {
+                    rows.push(currentRow);
+                    currentRow = [{ index, btn, rect }];
+                    currentTop = rect.top;
+                }
+            });
+            if (currentRow.length > 0) rows.push(currentRow);
+
+            // Find which row current item is in
+            let rowIndex = -1;
+            for (let i = 0; i < rows.length; i++) {
+                if (rows[i].some(item => item.index === currentIndex)) {
+                    rowIndex = i;
+                    break;
+                }
+            }
+
+            if (rowIndex === -1) return currentIndex; // Should not happen
+
+            let targetRowIndex = (direction === 'down') ? rowIndex + 1 : rowIndex - 1;
+
+            if (targetRowIndex >= 0 && targetRowIndex < rows.length) {
+                // Find closest item in target row
+                const targetRow = rows[targetRowIndex];
+                let bestMatch = targetRow[0];
+                let minDist = Number.MAX_VALUE;
+
+                targetRow.forEach(item => {
+                    const center = item.rect.left + (item.rect.width / 2);
+                    const dist = Math.abs(center - currentCenter);
+                    if (dist < minDist) {
+                        minDist = dist;
+                        bestMatch = item;
+                    }
+                });
+                return bestMatch.index;
+            }
+
+            return currentIndex; // Boundary reached
+        }
+
+        function handleBookKeydown(event) {
+            const grid = document.getElementById('bookGrid');
+            const buttons = grid.getElementsByClassName('grid-button');
+
+            if (event.ctrlKey || event.altKey || event.metaKey) return;
+
+            let direction = '';
+            if (event.key === 'ArrowDown') direction = 'down';
+            else if (event.key === 'ArrowUp') direction = 'up';
+            else if (event.key === 'ArrowRight') direction = 'right';
+            else if (event.key === 'ArrowLeft') direction = 'left';
+
+            if (direction) {
+                event.preventDefault();
+                showOverlay('bookGrid');
+                currentBookIndex = navigateGrid('bookGrid', currentBookIndex, direction);
+                updateBookHighlight(buttons);
+            } else if (event.key === 'Enter') {
+                if (currentBookIndex >= 0 && buttons[currentBookIndex]) {
+                    event.preventDefault();
+                    buttons[currentBookIndex].click();
+                    currentBookIndex = -1;
+                }
+            } else if (event.key === 'Escape') {
+                hideOverlay('bookGrid');
+                currentBookIndex = -1;
+                updateBookHighlight(buttons);
+                document.getElementById('bookInput').blur();
+            }
+        }
+
+        function updateBookHighlight(buttons) {
+            Array.from(buttons).forEach((btn, index) => {
+                if (index === currentBookIndex) {
+                    btn.classList.add('highlighted');
+                    btn.scrollIntoView({ block: 'nearest', inline: 'nearest' });
+                } else {
+                    btn.classList.remove('highlighted');
+                }
             });
         }
 
         function handleChaptersResponse(chapters) {
             updateChapterGrid(chapters);
-            
+            currentChapterIndex = -1; // Reset navigation
+
             document.getElementById('verseGrid').innerHTML = '';
             hideVersePreview();
-            
-            // Handle pending quick selection
-            if (pendingQuickSelection) {
-                const { chapter, verse } = pendingQuickSelection;
-                
-                // Check if the requested chapter exists
-                if (chapters.includes(chapter)) {
-                    selectChapter(chapter);
-                } else {
-                    pendingQuickSelection = null;
-                }
+
+            if (shouldOpenChapterGrid) {
+                showOverlay('chapterGrid');
+                shouldOpenChapterGrid = false;
             }
         }
 
         function updateChapterGrid(chapters) {
             const grid = document.getElementById('chapterGrid');
             grid.innerHTML = '';
-            
-            chapters.forEach(chapter => {
+
+            chapters.forEach((chapter, index) => {
                 const button = document.createElement('div');
                 button.className = 'grid-button';
                 if (chapter === selectedChapter) {
@@ -886,7 +1112,57 @@
                 }
                 button.textContent = chapter;
                 button.onclick = () => selectChapter(chapter);
+                button.dataset.index = index;
                 grid.appendChild(button);
+            });
+        }
+
+        function handleChapterKeydown(event) {
+            const grid = document.getElementById('chapterGrid');
+            const buttons = grid.getElementsByClassName('grid-button');
+
+            if (event.ctrlKey || event.altKey || event.metaKey) return;
+
+            if (!grid.classList.contains('show')) {
+                if (['Enter', ' ', 'ArrowDown', 'ArrowUp'].includes(event.key)) {
+                    event.preventDefault();
+                    showOverlay('chapterGrid');
+                    return;
+                }
+            }
+
+            let direction = '';
+            if (event.key === 'ArrowDown') direction = 'down';
+            else if (event.key === 'ArrowUp') direction = 'up';
+            else if (event.key === 'ArrowRight') direction = 'right';
+            else if (event.key === 'ArrowLeft') direction = 'left';
+
+            if (direction) {
+                event.preventDefault();
+                currentChapterIndex = navigateGrid('chapterGrid', currentChapterIndex, direction);
+                updateChapterHighlight(buttons);
+            } else if (event.key === 'Enter' || event.key === ' ') {
+                if (currentChapterIndex >= 0 && buttons[currentChapterIndex]) {
+                    event.preventDefault();
+                    buttons[currentChapterIndex].click();
+                    currentChapterIndex = -1;
+                }
+            } else if (event.key === 'Escape') {
+                hideOverlay('chapterGrid');
+                currentChapterIndex = -1;
+                updateChapterHighlight(buttons);
+                document.getElementById('chapterTrigger').blur();
+            }
+        }
+
+        function updateChapterHighlight(buttons) {
+            Array.from(buttons).forEach((btn, index) => {
+                if (index === currentChapterIndex) {
+                    btn.classList.add('highlighted');
+                    btn.scrollIntoView({ block: 'nearest', inline: 'nearest' });
+                } else {
+                    btn.classList.remove('highlighted');
+                }
             });
         }
 
@@ -896,6 +1172,10 @@
             selectedVerse = 0;
             currentVerse = 0;
 
+            // Update trigger text
+            document.getElementById('chapterTrigger').textContent = `Chapter ${chapter}`;
+            document.getElementById('verseTrigger').textContent = 'Select Verse';
+
             updateChapterGrid(getChapterNumbersFromGrid()); // Re-render to update highlighting
 
             document.getElementById('verseGrid').innerHTML = '';
@@ -903,29 +1183,29 @@
 
             requestVerses(selectedBook, chapter);
             updateNavigationButtons();
+
+            // Auto-open next step (Verse Grid)
+            // We can show it immediately, but it will be empty until response comes.
+            // Better to use flag again.
+            hideAllOverlays();
+            shouldOpenVerseGrid = true;
         }
 
         function getChapterNumbersFromGrid() {
-             const grid = document.getElementById('chapterGrid');
-             const buttons = grid.getElementsByClassName('grid-button');
-             return Array.from(buttons).map(btn => parseInt(btn.textContent));
+            const grid = document.getElementById('chapterGrid');
+            const buttons = grid.getElementsByClassName('grid-button');
+            return Array.from(buttons).map(btn => parseInt(btn.textContent));
         }
 
         function handleVersesResponse(verses) {
             updateVerseGrid(verses);
-            
+            currentVerseIndex = -1;
+
             hideVersePreview();
-            
-            // Handle pending quick selection
-            if (pendingQuickSelection) {
-                const { verse } = pendingQuickSelection;
-                
-                // Check if the requested verse exists
-                if (verses.includes(verse)) {
-                   selectVerseFromGrid(verse);
-                }
-                
-                pendingQuickSelection = null;
+
+            if (shouldOpenVerseGrid) {
+                showOverlay('verseGrid');
+                shouldOpenVerseGrid = false;
             }
         }
 
@@ -933,7 +1213,7 @@
             const grid = document.getElementById('verseGrid');
             grid.innerHTML = '';
 
-            verses.forEach(verse => {
+            verses.forEach((verse, index) => {
                 const button = document.createElement('div');
                 button.className = 'grid-button';
                 if (verse === selectedVerse) {
@@ -941,7 +1221,57 @@
                 }
                 button.textContent = verse;
                 button.onclick = () => selectVerseFromGrid(verse);
+                button.dataset.index = index;
                 grid.appendChild(button);
+            });
+        }
+
+        function handleVerseKeydown(event) {
+            const grid = document.getElementById('verseGrid');
+            const buttons = grid.getElementsByClassName('grid-button');
+
+            if (event.ctrlKey || event.altKey || event.metaKey) return;
+
+            if (!grid.classList.contains('show')) {
+                if (['Enter', ' ', 'ArrowDown', 'ArrowUp'].includes(event.key)) {
+                    event.preventDefault();
+                    showOverlay('verseGrid');
+                    return;
+                }
+            }
+
+            let direction = '';
+            if (event.key === 'ArrowDown') direction = 'down';
+            else if (event.key === 'ArrowUp') direction = 'up';
+            else if (event.key === 'ArrowRight') direction = 'right';
+            else if (event.key === 'ArrowLeft') direction = 'left';
+
+            if (direction) {
+                event.preventDefault();
+                currentVerseIndex = navigateGrid('verseGrid', currentVerseIndex, direction);
+                updateVerseHighlight(buttons);
+            } else if (event.key === 'Enter' || event.key === ' ') {
+                if (currentVerseIndex >= 0 && buttons[currentVerseIndex]) {
+                    event.preventDefault();
+                    buttons[currentVerseIndex].click();
+                    currentVerseIndex = -1;
+                }
+            } else if (event.key === 'Escape') {
+                hideOverlay('verseGrid');
+                currentVerseIndex = -1;
+                updateVerseHighlight(buttons);
+                document.getElementById('verseTrigger').blur();
+            }
+        }
+
+        function updateVerseHighlight(buttons) {
+            Array.from(buttons).forEach((btn, index) => {
+                if (index === currentVerseIndex) {
+                    btn.classList.add('highlighted');
+                    btn.scrollIntoView({ block: 'nearest', inline: 'nearest' });
+                } else {
+                    btn.classList.remove('highlighted');
+                }
             });
         }
 
@@ -949,16 +1279,22 @@
             selectedVerse = verse;
             currentVerse = verse;
 
+            // Update trigger text
+            document.getElementById('verseTrigger').textContent = `Verse ${verse}`;
+
             updateVerseGrid(getVerseNumbersFromGrid());
 
             requestVersePreview(selectedBook, selectedChapter, verse);
             updateNavigationButtons();
+
+            // Close overlays
+            hideAllOverlays();
         }
 
         function getVerseNumbersFromGrid() {
-             const grid = document.getElementById('verseGrid');
-             const buttons = grid.getElementsByClassName('grid-button');
-             return Array.from(buttons).map(btn => parseInt(btn.textContent));
+            const grid = document.getElementById('verseGrid');
+            const buttons = grid.getElementsByClassName('grid-button');
+            return Array.from(buttons).map(btn => parseInt(btn.textContent));
         }
 
         function handleSpeakersResponse(speakerList) {
@@ -968,13 +1304,20 @@
 
         function showSpeakerDropdown(speakerList) {
             const dropdown = document.getElementById('speakerDropdown');
+            const input = document.getElementById('speakerInput');
             dropdown.innerHTML = '';
-            
+
+            // Do not show dropdown if input is not focused and empty (prevents opening on initial load)
+            if (document.activeElement !== input && (!input.value || input.value.trim() === '')) {
+                dropdown.style.display = 'none';
+                return;
+            }
+
             if (speakerList.length === 0) {
                 dropdown.style.display = 'none';
                 return;
             }
-            
+
             speakerList.slice(0, 10).forEach((speaker, index) => {
                 const item = document.createElement('div');
                 item.className = 'autocomplete-item';
@@ -984,7 +1327,7 @@
                 });
                 dropdown.appendChild(item);
             });
-            
+
             dropdown.style.display = 'block';
             currentSpeakerIndex = -1;
         }
@@ -998,7 +1341,7 @@
         function filterSpeakers() {
             const input = document.getElementById('speakerInput');
             const filter = input.value;
-            
+
             if (filter.length > 0) {
                 requestSpeakers(filter);
             } else {
@@ -1009,7 +1352,7 @@
         function handleSpeakerKeydown(event) {
             const dropdown = document.getElementById('speakerDropdown');
             const items = dropdown.getElementsByClassName('autocomplete-item');
-            
+
             if (event.key === 'ArrowDown') {
                 event.preventDefault();
                 currentSpeakerIndex = Math.min(currentSpeakerIndex + 1, items.length - 1);
@@ -1044,13 +1387,13 @@
         function handleSearchResults(results) {
             const searchResults = document.getElementById('searchResults');
             searchResults.innerHTML = '';
-            
+
             if (results.length > 0) {
                 searchResults.style.display = 'block';
                 results.forEach(result => {
                     const div = document.createElement('div');
                     div.className = 'search-result';
-                    
+
                     // Handle new structure where result.name contains the reference
                     let verseReference;
                     if (result.name) {
@@ -1060,7 +1403,7 @@
                     } else {
                         verseReference = `Chapter ${result.chapter}:${result.verse}`;
                     }
-                    
+
                     div.innerHTML = `
                         <div class="verse-reference">${verseReference}</div>
                         <div class="verse-text">${result.text}</div>
@@ -1091,34 +1434,36 @@
                 console.error('No book name found in search result');
                 return;
             }
-            
+
             // Set the book, chapter, and verse selections
             document.getElementById('bookInput').value = bookName;
             selectedBook = bookName;
             currentBook = bookName;
-            
+
             // Request chapters for this book
             requestChapters(bookName);
-            
+
             // Set chapter and verse when chapters load
             setTimeout(() => {
-                document.getElementById('chapterSelect').value = result.chapter;
+                // Update trigger instead of select
+                document.getElementById('chapterTrigger').textContent = `Chapter ${result.chapter}`;
                 selectedChapter = result.chapter;
                 currentChapter = result.chapter;
-                
+
                 // Request verses for this chapter
                 requestVerses(bookName, result.chapter);
-                
+
                 // Set verse when verses load
                 setTimeout(() => {
-                    document.getElementById('verseSelect').value = result.verse;
+                    // Update trigger instead of select
+                    document.getElementById('verseTrigger').textContent = `Verse ${result.verse}`;
                     selectedVerse = result.verse;
                     currentVerse = result.verse;
                     showVersePreview(result);
                     updateNavigationButtons();
                 }, 100);
             }, 100);
-            
+
             hideBookDropdown();
             document.getElementById('searchResults').style.display = 'none';
         }
@@ -1130,9 +1475,9 @@
                 console.error('Invalid book name:', bookName);
                 return;
             }
-            
+
             document.getElementById('bookInput').value = bookName;
-            
+
             currentBook = bookName;
             selectedBook = bookName;
             currentChapter = 0;
@@ -1140,22 +1485,37 @@
             currentVerse = 0;
             selectedVerse = 0;
             currentBookData = null;
-            
+
+            // Reset triggers
+            document.getElementById('chapterTrigger').textContent = 'Select Chapter';
+            document.getElementById('verseTrigger').textContent = 'Select Verse';
+
             // Highlight selected book button
             updateBookGrid(books);
 
             // Clear chapter and verse grids
             document.getElementById('chapterGrid').innerHTML = '';
             document.getElementById('verseGrid').innerHTML = '';
-            
+
             // Request chapters for this book
             const message = {
                 type: 'get_chapters',
                 book: bookName
             };
-            
+
             ws.send(JSON.stringify(message));
             updateNavigationButtons();
+
+            // Auto-open next step
+            hideAllOverlays();
+            // We can't show chapter grid yet because chapters haven't loaded. 
+            // We'll rely on handleChaptersResponse to update grid, but we need to trigger the overlay.
+            // Since requestChapters is async, we can set a flag or just show it when response comes?
+            // Actually, showing an empty grid or loading state might be better, 
+            // but let's wait for chapters to load.
+            // However, the user wants "auto-open". 
+            // We can set a flag to open chapter grid when chapters arrive.
+            shouldOpenChapterGrid = true;
         }
 
         function showVersePreview(verse) {
@@ -1164,7 +1524,7 @@
             let bookName = selectedBook;
             let chapterNum = verse.chapter || selectedChapter;
             let verseNum = verse.verse || selectedVerse;
-            
+
             // Handle both old format (with book property) and new format (with name property)
             if (verse.name) {
                 verseReference = verse.name; // Use the name field from new JSON structure
@@ -1180,7 +1540,7 @@
             } else {
                 verseReference = `${bookName} ${chapterNum}:${verseNum}`;
             }
-            
+
             // Store current verse data for display
             currentVerseData = verse;
 
@@ -1190,13 +1550,13 @@
             verseTextContainer.innerHTML = verse.text.split(' ').map((word, index) => `<span class="word" id="word-${index}">${word}</span>`).join(' ');
             document.getElementById('versePreview').style.display = 'block';
             document.getElementById('displayBtn').disabled = false;
-            
+
             // Update the current verse reference in navigation area
             const currentRef = document.getElementById('currentVerseRef');
             if (currentRef) {
                 currentRef.textContent = `Current: ${bookName} ${chapterNum}:${verseNum}`;
             }
-            
+
             console.log('Verse preview updated:', {
                 reference: verseReference,
                 book: bookName,
@@ -1204,10 +1564,10 @@
                 verse: verseNum,
                 text: verse.text.substring(0, 50) + '...'
             });
-            
+
             // Update navigation buttons when verse is shown
             updateNavigationButtons();
-            
+
             // Request next verse preview automatically
             if (selectedBook && selectedChapter && selectedVerse) {
                 requestNextVersePreview(selectedBook, selectedChapter, selectedVerse);
@@ -1226,7 +1586,7 @@
             let bookName = selectedBook;
             let chapterNum = verse.chapter || selectedChapter;
             let verseNum = verse.verse || selectedVerse;
-            
+
             // Handle both old format (with book property) and new format (with name property)
             if (verse.name) {
                 verseReference = verse.name;
@@ -1242,7 +1602,7 @@
             } else {
                 verseReference = `${bookName} ${chapterNum}:${verseNum}`;
             }
-            
+
             // Store the next verse text for auto-advance matching
             nextVerseTextForMatching = verse.text;
 
@@ -1250,7 +1610,7 @@
             document.getElementById('nextVerseReference').textContent = verseReference;
             document.getElementById('nextVerseText').textContent = verse.text;
             document.getElementById('nextVersePreview').style.display = 'block';
-            
+
             console.log('Next verse preview updated:', {
                 reference: verseReference,
                 text: verse.text.substring(0, 50) + '...'
@@ -1309,14 +1669,12 @@
         }
 
         // Book input event handlers
-        document.getElementById('bookInput').addEventListener('input', function() {
+        document.getElementById('bookInput').addEventListener('input', function () {
             const filter = this.value;
             requestBooks(filter);
         });
 
 
-
-        let pendingQuickSelection = null;
 
         function setCountdownPreset(time) {
             document.getElementById('customTime').value = time;
@@ -1364,4 +1722,5 @@
         connect();
     </script>
 </body>
+
 </html>
