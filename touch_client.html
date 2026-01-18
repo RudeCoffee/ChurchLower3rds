@@ -157,6 +157,28 @@
             font-weight: bold;
         }
 
+        .nav-breadcrumbs {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .breadcrumb-btn {
+            background-color: var(--container-bg);
+            border: 1px solid var(--border-color);
+            color: var(--text-color);
+            padding: 10px 15px;
+            border-radius: 4px;
+            font-size: 18px;
+            cursor: pointer;
+            font-weight: bold;
+        }
+
+        .breadcrumb-btn:hover {
+            border-color: var(--accent-color);
+            color: var(--accent-color);
+        }
+
         /* Control View (Verse Display) */
         .control-view {
             display: flex;
@@ -302,8 +324,7 @@
         <div id="bible-section" class="section active">
             <!-- Navigation Header (Hidden on root) -->
             <div class="nav-header" id="bible-nav-header" style="display: none;">
-                <button class="back-btn" onclick="goBack()">← Back</button>
-                <span class="nav-title" id="bible-nav-title">Select Book</span>
+                <div class="nav-breadcrumbs" id="bible-breadcrumbs"></div>
             </div>
 
             <!-- Views -->
@@ -508,7 +529,6 @@
 
         function selectBook(book) {
             selectedBook = book;
-            document.getElementById('bible-nav-title').textContent = book;
             if (ws && ws.readyState === WebSocket.OPEN) {
                 ws.send(JSON.stringify({ type: 'get_chapters', book: book }));
             }
@@ -529,7 +549,6 @@
 
         function selectChapter(chapter) {
             selectedChapter = chapter;
-            document.getElementById('bible-nav-title').textContent = `${selectedBook} ${chapter}`;
             if (ws && ws.readyState === WebSocket.OPEN) {
                 ws.send(JSON.stringify({ type: 'get_verses', book: selectedBook, chapter: chapter }));
             }
@@ -580,7 +599,6 @@
 
             document.getElementById('preview-ref').textContent = verseRef;
             document.getElementById('preview-text').textContent = verseText;
-            document.getElementById('bible-nav-title').textContent = verseRef;
 
             // Clear previous next preview until loaded
             document.getElementById('next-verse-preview').style.display = 'none';
@@ -623,22 +641,68 @@
 
             document.getElementById('view-' + viewName).style.display = (viewName === 'control' ? 'flex' : 'grid');
 
+            updateBreadcrumbs(viewName);
+        }
+
+        function updateBreadcrumbs(viewName) {
+            const container = document.getElementById('bible-breadcrumbs');
             const header = document.getElementById('bible-nav-header');
+            container.innerHTML = '';
+
             if (viewName === 'books') {
                 header.style.display = 'none';
-            } else {
-                header.style.display = 'flex';
+                return;
+            }
+
+            header.style.display = 'flex';
+
+            // Back Button logic is now integrated into breadcrumbs
+
+            // Always add Book Button if not in books view
+            if (selectedBook) {
+                const bookBtn = document.createElement('div');
+                bookBtn.className = 'breadcrumb-btn';
+                bookBtn.textContent = selectedBook;
+                bookBtn.onclick = () => {
+                    isLive = false;
+                    showBibleView('books');
+                };
+                container.appendChild(bookBtn);
+            }
+
+            // Add Chapter Button if in verses or control view
+            if ((viewName === 'verses' || viewName === 'control') && selectedChapter) {
+                const chapBtn = document.createElement('div');
+                chapBtn.className = 'breadcrumb-btn';
+                chapBtn.textContent = 'Chapter ' + selectedChapter;
+                chapBtn.onclick = () => {
+                    isLive = false;
+                    showBibleView('chapters');
+                };
+                container.appendChild(chapBtn);
+            }
+
+            // Add Verse Button if in control view
+            if (viewName === 'control' && selectedVerse) {
+                const verseBtn = document.createElement('div');
+                verseBtn.className = 'breadcrumb-btn';
+                verseBtn.textContent = 'Verse ' + selectedVerse;
+                verseBtn.onclick = () => {
+                    isLive = false;
+                    showBibleView('verses');
+                };
+                container.appendChild(verseBtn);
             }
         }
 
         function goBack() {
-            isLive = false; // Navigating away resets live expectation in UI
+            // Function kept for compatibility if needed, but UI now uses breadcrumbs.
+            // Mapping back button logic to breadcrumb levels
+            isLive = false;
             if (currentView === 'control') {
                 showBibleView('verses');
-                document.getElementById('bible-nav-title').textContent = `${selectedBook} ${selectedChapter}`;
             } else if (currentView === 'verses') {
                 showBibleView('chapters');
-                document.getElementById('bible-nav-title').textContent = selectedBook;
             } else if (currentView === 'chapters') {
                 showBibleView('books');
             }
