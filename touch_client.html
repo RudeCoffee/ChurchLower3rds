@@ -400,7 +400,7 @@
         <!-- SEARCH SECTION -->
         <div id="search-section" class="section">
             <div class="input-group">
-                <input type="text" id="search-input" placeholder="Search scripture...">
+                <input type="text" id="search-input" placeholder="Search scripture..." oninput="debounceSearch()">
                 <button class="action-btn btn-display" style="width: 100px; font-size: 18px;" onclick="searchBible()">Go</button>
             </div>
             <div id="search-results" class="search-results"></div>
@@ -419,6 +419,7 @@
         let currentView = 'books'; // books, chapters, verses, control
         let isLive = false;
         let isOutputActive = false;
+        let searchTimeout = null;
 
         // Data
         let books = [];
@@ -852,6 +853,13 @@
         }
 
         // Search Logic
+        function debounceSearch() {
+            clearTimeout(searchTimeout);
+            searchTimeout = setTimeout(() => {
+                searchBible();
+            }, 300);
+        }
+
         function searchBible() {
             const query = document.getElementById('search-input').value;
             if (query && ws && ws.readyState === WebSocket.OPEN) {
