@@ -289,6 +289,19 @@
             border-color: var(--accent-color);
         }
 
+        .search-result-ref {
+            font-size: 24px;
+            font-weight: bold;
+            margin-bottom: 8px;
+            color: var(--accent-color);
+        }
+
+        .search-result-text {
+            font-size: 20px;
+            color: #d0d0d0;
+            line-height: 1.4;
+        }
+
         .status-bar {
             position: fixed;
             bottom: 10px;
@@ -885,13 +898,11 @@
                 const ref = res.name || `${res.chapter}:${res.verse}`;
 
                 const refDiv = document.createElement('div');
-                refDiv.style.fontWeight = 'bold';
+                refDiv.className = 'search-result-ref';
                 refDiv.textContent = ref;
 
                 const textDiv = document.createElement('div');
-                textDiv.style.fontSize = '14px';
-                textDiv.style.marginTop = '5px';
-                textDiv.style.color = '#aaa';
+                textDiv.className = 'search-result-text';
                 textDiv.textContent = res.text;
 
                 div.appendChild(refDiv);
