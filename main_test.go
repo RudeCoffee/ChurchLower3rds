@@ -1,6 +1,8 @@
 package main
 
 import (
+	"net/http"
+	"net/http/httptest"
 	"strings"
 	"testing"
 )
@@ -47,6 +49,58 @@ func BenchmarkSearchBible(b *testing.B) {
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
 		_ = searchBible(query)
+	}
+}
+
+func TestSecureFileHandler(t *testing.T) {
+	// Create a dummy handler to wrap
+	nextHandler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusOK)
+		w.Write([]byte("OK"))
+	})
+
+	handler := secureFileHandler(nextHandler)
+
+	tests := []struct {
+		name           string
+		path           string
+		expectedStatus int
+		expectedLoc    string // for redirects
+	}{
+		{"Root redirect", "/", http.StatusTemporaryRedirect, "/client.html"},
+		{"Allowed HTML", "/client.html", http.StatusOK, ""},
+		{"Allowed PNG", "/logo.png", http.StatusOK, ""},
+		{"Allowed CSS", "/style.css", http.StatusOK, ""},
+		{"Blocked Go Source", "/main.go", http.StatusForbidden, ""},
+		{"Blocked Git Config", "/.git/config", http.StatusForbidden, ""},
+		{"Blocked Sensitive Config", "/speakers.txt", http.StatusForbidden, ""},
+		{"Blocked JSON Data", "/kjv.json", http.StatusForbidden, ""},
+		{"Blocked Unknown", "/readme.md", http.StatusForbidden, ""},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			req, err := http.NewRequest("GET", tc.path, nil)
+			if err != nil {
+				t.Fatal(err)
+			}
+
+			rr := httptest.NewRecorder()
+			handler.ServeHTTP(rr, req)
+
+			if rr.Code != tc.expectedStatus {
+				t.Errorf("handler returned wrong status code for %s: got %v want %v",
+					tc.path, rr.Code, tc.expectedStatus)
+			}
+
+			if tc.expectedLoc != "" {
+				loc := rr.Header().Get("Location")
+				if loc != tc.expectedLoc {
+					t.Errorf("handler returned wrong redirect location for %s: got %v want %v",
+						tc.path, loc, tc.expectedLoc)
+				}
+			}
+		})
 	}
 }
 

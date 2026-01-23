@@ -5,8 +5,9 @@ import (
 	"fmt"
 	"log"
 	"net"
-	"os"
 	"net/http"
+	"os"
+	"path"
 	"strconv"
 	"strings"
 	"sync"
@@ -810,6 +811,34 @@ func handleControlWebSocket(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
+func secureFileHandler(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path == "/" {
+			http.Redirect(w, r, "/client.html", http.StatusTemporaryRedirect)
+			return
+		}
+
+		ext := strings.ToLower(path.Ext(r.URL.Path))
+		allowedExts := map[string]bool{
+			".html": true,
+			".css":  true,
+			".js":   true,
+			".png":  true,
+			".jpg":  true,
+			".jpeg": true,
+			".ico":  true,
+			".svg":  true,
+		}
+
+		if !allowedExts[ext] {
+			http.Error(w, "Forbidden", http.StatusForbidden)
+			return
+		}
+
+		next.ServeHTTP(w, r)
+	})
+}
+
 func main() {
 	// Load Bible data
 	loadBibleData()
@@ -818,7 +847,8 @@ func main() {
 	loadSpeakers()
 
 	// Serve static files
-	http.Handle("/", http.FileServer(http.Dir("./")))
+	fs := http.FileServer(http.Dir("./"))
+	http.Handle("/", secureFileHandler(fs))
 
 	// WebSocket endpoints
 	http.HandleFunc("/ws/obs", handleOBSWebSocket)
