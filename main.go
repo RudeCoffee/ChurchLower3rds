@@ -108,6 +108,8 @@ var obsClientsMutex sync.Mutex
 var controlClients []*Client
 var controlClientsMutex sync.Mutex
 var bibleData BibleData
+// verseIndex maps lowercase book name to a 2D slice of verses [chapterIndex][verseIndex]
+var verseIndex map[string][][]*BibleVerse
 var speakers []string
 
 var currentState struct {
@@ -157,6 +159,52 @@ func loadBibleData() {
 	if err != nil {
 		log.Printf("Error parsing Bible data: %v", err)
 		return
+	}
+
+	// Build the verse index for O(1) lookup
+	verseIndex = make(map[string][][]*BibleVerse)
+	for i := range bibleData.Books {
+		book := &bibleData.Books[i] // Pointer to avoid copying
+		lowerBookName := strings.ToLower(book.Name)
+
+		// Create slice for chapters
+		numChapters := len(book.Chapters)
+		chapters := make([][]*BibleVerse, numChapters)
+
+		for j := range book.Chapters {
+			chapter := &book.Chapters[j]
+			// Check if chapter number aligns with index
+			if chapter.Chapter != j+1 {
+				// Fallback to safe sizing if data isn't perfectly sequential
+				// But we verified it is. This is just defensive.
+				if chapter.Chapter > len(chapters) {
+					newChapters := make([][]*BibleVerse, chapter.Chapter)
+					copy(newChapters, chapters)
+					chapters = newChapters
+				}
+			}
+
+			// Create slice for verses
+			numVerses := len(chapter.Verses)
+			verses := make([]*BibleVerse, numVerses)
+
+			for k := range chapter.Verses {
+				verse := &chapter.Verses[k]
+				if verse.Verse != k+1 {
+					// Defensive resizing
+					if verse.Verse > len(verses) {
+						newVerses := make([]*BibleVerse, verse.Verse)
+						copy(newVerses, verses)
+						verses = newVerses
+					}
+				}
+				// Use 0-based index for storage
+				verses[verse.Verse-1] = verse
+			}
+			// Use 0-based index for storage
+			chapters[chapter.Chapter-1] = verses
+		}
+		verseIndex[lowerBookName] = chapters
 	}
 
 	log.Printf("Loaded %d Bible books", len(bibleData.Books))
@@ -298,20 +346,23 @@ func getSpeakers(filter string) []string {
 }
 
 func getVerse(bookName string, chapterNum int, verseNum int) *BibleVerse {
-	for _, book := range bibleData.Books {
-		if strings.EqualFold(book.Name, bookName) {
-			for _, chapter := range book.Chapters {
-				if chapter.Chapter == chapterNum {
-					for _, verse := range chapter.Verses {
-						if verse.Verse == verseNum {
-							// Return the verse with the original name from the JSON
-							return &BibleVerse{
-								Chapter: verse.Chapter,
-								Text:    verse.Text,
-								Verse:   verse.Verse,
-								Name:    verse.Name, // Use the actual verse name from JSON
-							}
-						}
+	lowerBookName := strings.ToLower(bookName)
+	if chapters, ok := verseIndex[lowerBookName]; ok {
+		// Convert 1-based chapterNum to 0-based index
+		chIdx := chapterNum - 1
+		if chIdx >= 0 && chIdx < len(chapters) {
+			verses := chapters[chIdx]
+			// Convert 1-based verseNum to 0-based index
+			vIdx := verseNum - 1
+			if vIdx >= 0 && vIdx < len(verses) {
+				verse := verses[vIdx]
+				if verse != nil {
+					// Return a copy to match original behavior
+					return &BibleVerse{
+						Chapter: verse.Chapter,
+						Text:    verse.Text,
+						Verse:   verse.Verse,
+						Name:    verse.Name,
 					}
 				}
 			}
