@@ -261,10 +261,11 @@ func searchBible(query string) []BibleVerse {
 	// If no specific reference found, search text content
 	if len(results) == 0 {
 		for _, book := range bibleData.Books {
+			// Optimization: Check book name once per book instead of per verse
+			bookMatches := strings.Contains(book.LowerCaseName, query)
 			for _, chapter := range book.Chapters {
 				for _, verse := range chapter.Verses {
-					if strings.Contains(verse.LowerCaseText, query) ||
-						strings.Contains(book.LowerCaseName, query) {
+					if bookMatches || strings.Contains(verse.LowerCaseText, query) {
 						results = append(results, BibleVerse{
 							Chapter: verse.Chapter,
 							Verse:   verse.Verse,
