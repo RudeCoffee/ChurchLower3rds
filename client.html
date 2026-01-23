@@ -396,13 +396,27 @@
             border-color: var(--button-bg);
             outline: 2px solid var(--button-bg);
         }
+
+        /* Accessibility: Improved focus indicators */
+        button:focus-visible,
+        input:focus-visible,
+        select:focus-visible,
+        textarea:focus-visible,
+        .selector-trigger:focus-visible,
+        .grid-button:focus-visible,
+        .theme-toggle:focus-visible {
+            outline: 2px solid var(--button-bg);
+            outline-offset: 2px;
+            box-shadow: 0 0 0 4px rgba(0, 124, 186, 0.2);
+            /* Soft glow */
+        }
     </style>
 </head>
 
 <body class="light-mode">
-    <button class="theme-toggle" onclick="toggleTheme()" title="Toggle Dark Mode">🌙</button>
+    <button class="theme-toggle" onclick="toggleTheme()" title="Toggle Dark Mode" aria-label="Switch to dark mode">🌙</button>
 
-    <div class="status" id="status">Connecting...</div>
+    <div class="status" id="status" aria-live="polite">Connecting...</div>
 
     <div class="container" style="position: relative; z-index: 10;">
         <h1>Church Lower 3rds Control</h1>
@@ -441,12 +455,12 @@
             <div></div>
         </div>
 
-        <div class="verse-preview" id="versePreview">
+        <div class="verse-preview" id="versePreview" aria-live="polite">
             <h3 id="verseReference"></h3>
             <div class="verse-text" id="verseText"></div>
         </div>
 
-        <div class="next-verse-preview" id="nextVersePreview" style="display: none;">
+        <div class="next-verse-preview" id="nextVersePreview" style="display: none;" aria-live="polite">
             <h4 style="color: #888; margin-bottom: 10px;">Next Verse Preview:</h4>
             <h4 id="nextVerseReference" style="color: #aaa; font-size: 0.9em;"></h4>
             <div class="verse-text" id="nextVerseText" style="color: #999; font-size: 0.85em; font-style: italic;">
@@ -572,11 +586,13 @@
                 body.classList.remove('light-mode');
                 themeToggle.textContent = '☀️';
                 themeToggle.title = 'Toggle Light Mode';
+                themeToggle.setAttribute('aria-label', 'Switch to light mode');
                 localStorage.setItem('theme', 'dark');
             } else {
                 body.classList.add('light-mode');
                 themeToggle.textContent = '🌙';
                 themeToggle.title = 'Toggle Dark Mode';
+                themeToggle.setAttribute('aria-label', 'Switch to dark mode');
                 localStorage.setItem('theme', 'light');
             }
         }
@@ -591,10 +607,12 @@
                 body.classList.remove('light-mode');
                 themeToggle.textContent = '☀️';
                 themeToggle.title = 'Toggle Light Mode';
+                themeToggle.setAttribute('aria-label', 'Switch to light mode');
             } else {
                 body.classList.add('light-mode');
                 themeToggle.textContent = '🌙';
                 themeToggle.title = 'Toggle Dark Mode';
+                themeToggle.setAttribute('aria-label', 'Switch to dark mode');
             }
         });
 
