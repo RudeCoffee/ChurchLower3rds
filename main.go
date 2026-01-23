@@ -40,8 +40,9 @@ type BibleData struct {
 }
 
 type BibleBook struct {
-	Name     string         `json:"name"`
-	Chapters []BibleChapter `json:"chapters"`
+	Name          string         `json:"name"`
+	LowerCaseName string         `json:"-"`
+	Chapters      []BibleChapter `json:"chapters"`
 }
 
 type BibleChapter struct {
@@ -51,10 +52,11 @@ type BibleChapter struct {
 }
 
 type BibleVerse struct {
-	Chapter int    `json:"chapter"`
-	Text    string `json:"text"`
-	Verse   int    `json:"verse"`
-	Name    string `json:"name"`
+	Chapter       int    `json:"chapter"`
+	Text          string `json:"text"`
+	LowerCaseText string `json:"-"`
+	Verse         int    `json:"verse"`
+	Name          string `json:"name"`
 }
 
 type SearchRequest struct {
@@ -165,7 +167,8 @@ func loadBibleData() {
 	verseIndex = make(map[string][][]*BibleVerse)
 	for i := range bibleData.Books {
 		book := &bibleData.Books[i] // Pointer to avoid copying
-		lowerBookName := strings.ToLower(book.Name)
+		book.LowerCaseName = strings.ToLower(book.Name)
+		lowerBookName := book.LowerCaseName
 
 		// Create slice for chapters
 		numChapters := len(book.Chapters)
@@ -190,6 +193,7 @@ func loadBibleData() {
 
 			for k := range chapter.Verses {
 				verse := &chapter.Verses[k]
+				verse.LowerCaseText = strings.ToLower(verse.Text)
 				if verse.Verse != k+1 {
 					// Defensive resizing
 					if verse.Verse > len(verses) {
@@ -230,7 +234,7 @@ func searchBible(query string) []BibleVerse {
 				if err1 == nil && err2 == nil {
 					// Find matching book and verse
 					for _, book := range bibleData.Books {
-						if strings.Contains(strings.ToLower(book.Name), bookName) {
+						if strings.Contains(book.LowerCaseName, bookName) {
 							// Find the specific chapter
 							for _, chapterData := range book.Chapters {
 								if chapterData.Chapter == chapter {
@@ -259,8 +263,8 @@ func searchBible(query string) []BibleVerse {
 		for _, book := range bibleData.Books {
 			for _, chapter := range book.Chapters {
 				for _, verse := range chapter.Verses {
-					if strings.Contains(strings.ToLower(verse.Text), query) ||
-						strings.Contains(strings.ToLower(book.Name), query) {
+					if strings.Contains(verse.LowerCaseText, query) ||
+						strings.Contains(book.LowerCaseName, query) {
 						results = append(results, BibleVerse{
 							Chapter: verse.Chapter,
 							Verse:   verse.Verse,
