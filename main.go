@@ -121,6 +121,41 @@ var currentState struct {
 	mu      sync.Mutex
 }
 
+var highScore int
+var highScoreMutex sync.Mutex
+
+func loadHighScore() {
+	data, err := os.ReadFile("highscore.txt")
+	if err != nil {
+		log.Printf("Warning: Could not load highscore.txt: %v", err)
+		highScore = 0
+		return
+	}
+
+	score, err := strconv.Atoi(strings.TrimSpace(string(data)))
+	if err != nil {
+		log.Printf("Error parsing high score: %v", err)
+		highScore = 0
+		return
+	}
+
+	highScore = score
+	log.Printf("Loaded high score: %d", highScore)
+}
+
+func saveHighScore(score int) {
+	highScoreMutex.Lock()
+	defer highScoreMutex.Unlock()
+
+	if score > highScore {
+		highScore = score
+		err := os.WriteFile("highscore.txt", []byte(fmt.Sprintf("%d", highScore)), 0644)
+		if err != nil {
+			log.Printf("Error saving high score: %v", err)
+		}
+	}
+}
+
 func loadSpeakers() {
 	data, err := os.ReadFile("speakers.txt")
 	if err != nil {
@@ -504,6 +539,18 @@ func handleControlWebSocket(w http.ResponseWriter, r *http.Request) {
 	controlClientsMutex.Unlock()
 	log.Println("Control client connected")
 
+	// Send current high score on connection
+	highScoreMutex.Lock()
+	currentScore := highScore
+	highScoreMutex.Unlock()
+	client.WriteJSON(struct {
+		Type  string `json:"type"`
+		Score int    `json:"score"`
+	}{
+		Type:  "highscore_update",
+		Score: currentScore,
+	})
+
 	for {
 		var rawMsg json.RawMessage
 		err := conn.ReadJSON(&rawMsg)
@@ -530,6 +577,41 @@ func handleControlWebSocket(w http.ResponseWriter, r *http.Request) {
 		}
 
 		switch msgType.Type {
+		case "submit_score":
+			var req struct {
+				Type  string `json:"type"`
+				Score int    `json:"score"`
+			}
+			if err := json.Unmarshal(rawMsg, &req); err == nil {
+				highScoreMutex.Lock()
+				if req.Score > highScore {
+					highScore = req.Score
+					// Persist
+					go func(score int) {
+						err := os.WriteFile("highscore.txt", []byte(fmt.Sprintf("%d", score)), 0644)
+						if err != nil {
+							log.Printf("Error saving high score: %v", err)
+						}
+					}(req.Score)
+
+					// Broadcast new high score to all control clients
+					updateMsg := struct {
+						Type  string `json:"type"`
+						Score int    `json:"score"`
+					}{
+						Type:  "highscore_update",
+						Score: highScore,
+					}
+
+					controlClientsMutex.Lock()
+					for _, c := range controlClients {
+						c.WriteJSON(updateMsg)
+					}
+					controlClientsMutex.Unlock()
+				}
+				highScoreMutex.Unlock()
+			}
+
 		case "countdown":
 			var countdownMsg CountdownMessage
 			if err := json.Unmarshal(rawMsg, &countdownMsg); err == nil {
@@ -816,6 +898,9 @@ func main() {
 
 	// Load speakers
 	loadSpeakers()
+
+	// Load high score
+	loadHighScore()
 
 	// Serve static files
 	http.Handle("/", http.FileServer(http.Dir("./")))
