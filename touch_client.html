@@ -315,6 +315,91 @@
         .status-connected { color: #28a745; }
         .status-disconnected { color: #dc3545; }
 
+        /* Game Section */
+        #game-section {
+            position: relative;
+            overflow: hidden;
+            display: none;
+        }
+
+        #game-section.active {
+            display: flex;
+        }
+
+        #game-canvas {
+            width: 100%;
+            height: 100%;
+            background-color: #87CEEB; /* Sky blue */
+            display: block;
+        }
+
+        .game-overlay {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            background: rgba(0, 0, 0, 0.7);
+            color: white;
+            z-index: 10;
+        }
+
+        .game-title {
+            font-size: 48px;
+            font-weight: bold;
+            margin-bottom: 20px;
+            text-shadow: 2px 2px 4px black;
+        }
+
+        .game-score {
+            font-size: 32px;
+            margin-bottom: 30px;
+        }
+
+        .game-btn {
+            background-color: var(--accent-color);
+            color: white;
+            border: none;
+            padding: 15px 40px;
+            font-size: 24px;
+            border-radius: 50px;
+            cursor: pointer;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.3);
+            transition: transform 0.1s;
+        }
+
+        .game-btn:active {
+            transform: scale(0.95);
+        }
+
+        #score-display {
+            position: absolute;
+            top: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            font-size: 48px;
+            font-weight: bold;
+            color: white;
+            text-shadow: 2px 2px 4px black;
+            z-index: 5;
+            pointer-events: none;
+        }
+
+        #highscore-display {
+            position: absolute;
+            top: 20px;
+            right: 20px;
+            font-size: 18px;
+            color: white;
+            text-shadow: 1px 1px 2px black;
+            z-index: 5;
+            pointer-events: none;
+        }
+
     </style>
 </head>
 <body>
@@ -324,6 +409,7 @@
         <div class="sidebar-item" onclick="switchTab('speaker')">🎤 Speaker</div>
         <div class="sidebar-item" onclick="switchTab('countdown')">⏱️ Timer</div>
         <div class="sidebar-item" onclick="switchTab('search')">🔍 Search</div>
+        <div class="sidebar-item" onclick="switchTab('game')">🎮 Game</div>
 
         <div class="sidebar-item" id="btn-fullscreen" onclick="enterFullScreen()" style="margin-top: auto;">⛶ Fullscreen</div>
         <div class="sidebar-item" id="btn-exit-fullscreen" onclick="exitFullScreen()" style="display: none; margin-top: auto;">✕ Exit Fullscreen</div>
@@ -418,6 +504,33 @@
             </div>
             <div id="search-results" class="search-results"></div>
         </div>
+
+        <!-- GAME SECTION -->
+        <div id="game-section" class="section">
+            <div id="score-display">0</div>
+            <div id="highscore-display">High Score: 0</div>
+            <canvas id="game-canvas"></canvas>
+
+            <!-- Start Overlay -->
+            <div id="game-start-overlay" class="game-overlay">
+                <div class="game-title">Church Flappy</div>
+                <div class="game-score">Tap to Jump</div>
+                <button class="game-btn" onclick="startGame()">Start Game</button>
+            </div>
+
+            <!-- Game Over Overlay -->
+            <div id="game-over-overlay" class="game-overlay" style="display: none;">
+                <div class="game-title">Game Over</div>
+                <div class="game-score" id="final-score">Score: 0</div>
+                <button class="game-btn" onclick="startGame()">Play Again</button>
+            </div>
+
+            <!-- Paused Overlay -->
+            <div id="game-paused-overlay" class="game-overlay" style="display: none;">
+                <div class="game-title">Paused</div>
+                <button class="game-btn" onclick="resumeGame()">Resume</button>
+            </div>
+        </div>
     </div>
 
     <div id="status-display" class="status-bar">Connecting...</div>
@@ -434,6 +547,21 @@
         let isOutputActive = false;
         let isSpeakerLive = false;
         let searchTimeout = null;
+
+        // Game State
+        let gameCanvas, ctx;
+        let gameScore = 0;
+        let highScore = 0;
+        let gameRunning = false;
+        let gamePaused = false;
+        let lastTime = 0;
+        let bird = { x: 50, y: 0, width: 30, height: 30, velocity: 0, radius: 15 };
+        let pipes = [];
+        const GRAVITY = 0.5; // Slightly reduced for better feel
+        const JUMP = -8;
+        const PIPE_SPEED = 3;
+        const PIPE_SPAWN_RATE = 1500; // ms
+        let lastPipeSpawn = 0;
 
         // Data
         let books = [];
@@ -503,6 +631,10 @@
                 case 'search_results':
                     renderSearchResults(data.results);
                     break;
+                case 'highscore_update':
+                    highScore = data.score;
+                    updateHighScoreDisplay();
+                    break;
             }
         }
 
@@ -518,10 +650,24 @@
             if(tabId === 'speaker') items[1].classList.add('active');
             if(tabId === 'countdown') items[2].classList.add('active');
             if(tabId === 'search') items[3].classList.add('active');
+            if(tabId === 'game') items[4].classList.add('active');
 
             // Sections visibility
             document.querySelectorAll('.section').forEach(el => el.classList.remove('active'));
             document.getElementById(tabId + '-section').classList.add('active');
+
+            // Game Pause/Resume Logic
+            if (tabId === 'game') {
+                initGameCanvas();
+                if (gameRunning && gamePaused) {
+                    // Show paused overlay
+                    document.getElementById('game-paused-overlay').style.display = 'flex';
+                }
+            } else {
+                if (gameRunning) {
+                    pauseGame();
+                }
+            }
         }
 
         // Requests
@@ -1002,6 +1148,256 @@
         document.addEventListener('fullscreenchange', updateFullScreenButtons);
         document.addEventListener('webkitfullscreenchange', updateFullScreenButtons);
         document.addEventListener('msfullscreenchange', updateFullScreenButtons);
+
+        // --- GAME LOGIC ---
+
+        function initGameCanvas() {
+            gameCanvas = document.getElementById('game-canvas');
+            if (!gameCanvas) return;
+
+            ctx = gameCanvas.getContext('2d');
+
+            // Resize canvas to fit container
+            const container = document.getElementById('game-section');
+            gameCanvas.width = container.clientWidth;
+            gameCanvas.height = container.clientHeight;
+
+            // Handle window resize
+            window.addEventListener('resize', () => {
+                if (currentTab === 'game') {
+                    gameCanvas.width = container.clientWidth;
+                    gameCanvas.height = container.clientHeight;
+                }
+            });
+
+            // Input handling
+            gameCanvas.addEventListener('touchstart', (e) => {
+                e.preventDefault(); // prevent scrolling
+                jump();
+            });
+            gameCanvas.addEventListener('mousedown', (e) => {
+                 jump();
+            });
+
+            // Initial Draw
+            if (!gameRunning && !gamePaused) {
+                 // Clear
+                 ctx.clearRect(0, 0, gameCanvas.width, gameCanvas.height);
+                 // Draw something static?
+            }
+        }
+
+        function startGame() {
+            document.getElementById('game-start-overlay').style.display = 'none';
+            document.getElementById('game-over-overlay').style.display = 'none';
+            document.getElementById('game-paused-overlay').style.display = 'none';
+
+            resetGame();
+            gameRunning = true;
+            gamePaused = false;
+            lastTime = performance.now();
+            requestAnimationFrame(gameLoop);
+        }
+
+        function resetGame() {
+            gameScore = 0;
+            updateScoreDisplay();
+
+            bird.x = gameCanvas.width * 0.2;
+            bird.y = gameCanvas.height / 2;
+            bird.velocity = 0;
+
+            pipes = [];
+            lastPipeSpawn = 0;
+        }
+
+        function jump() {
+            if (gameRunning && !gamePaused) {
+                bird.velocity = JUMP;
+            }
+        }
+
+        function pauseGame() {
+            if (gameRunning) {
+                gamePaused = true;
+            }
+        }
+
+        function resumeGame() {
+            if (gameRunning && gamePaused) {
+                gamePaused = false;
+                document.getElementById('game-paused-overlay').style.display = 'none';
+                lastTime = performance.now();
+                requestAnimationFrame(gameLoop);
+            }
+        }
+
+        function stopGame() {
+            gameRunning = false;
+            document.getElementById('game-over-overlay').style.display = 'flex';
+            document.getElementById('final-score').textContent = 'Score: ' + gameScore;
+
+            // Check High Score
+            if (gameScore > highScore) {
+                highScore = gameScore;
+                updateHighScoreDisplay();
+                // Send to server
+                 if (ws && ws.readyState === WebSocket.OPEN) {
+                    ws.send(JSON.stringify({
+                        type: 'submit_score',
+                        score: highScore
+                    }));
+                }
+            }
+        }
+
+        function updateScoreDisplay() {
+            document.getElementById('score-display').textContent = gameScore;
+        }
+
+        function updateHighScoreDisplay() {
+            const el = document.getElementById('highscore-display');
+            if(el) el.textContent = 'High Score: ' + highScore;
+        }
+
+        function gameLoop(timestamp) {
+            if (!gameRunning || gamePaused) return;
+
+            const dt = timestamp - lastTime;
+            lastTime = timestamp;
+
+            update(dt);
+            draw();
+
+            requestAnimationFrame(gameLoop);
+        }
+
+        function update(dt) {
+            // Bird Physics
+            bird.velocity += GRAVITY;
+            bird.y += bird.velocity;
+
+            // Floor/Ceiling Collision
+            if (bird.y + bird.radius > gameCanvas.height) {
+                stopGame();
+                return;
+            }
+            if (bird.y - bird.radius < 0) {
+                bird.y = bird.radius;
+                bird.velocity = 0;
+            }
+
+            // Pipes
+            if (lastTime - lastPipeSpawn > PIPE_SPAWN_RATE) {
+                spawnPipe();
+                lastPipeSpawn = lastTime;
+            }
+
+            for (let i = pipes.length - 1; i >= 0; i--) {
+                let pipe = pipes[i];
+                pipe.x -= PIPE_SPEED;
+
+                // Collision
+                // Bird is a circle, pipes are rectangles.
+                // Simple AABB check for now (treating bird as square for safety)
+
+                // Bird AABB
+                const birdLeft = bird.x - bird.radius + 5; // buffer
+                const birdRight = bird.x + bird.radius - 5;
+                const birdTop = bird.y - bird.radius + 5;
+                const birdBottom = bird.y + bird.radius - 5;
+
+                // Top Pipe
+                if (birdRight > pipe.x && birdLeft < pipe.x + pipe.width) {
+                    if (birdTop < pipe.gapTop) {
+                        stopGame();
+                        return;
+                    }
+                }
+
+                // Bottom Pipe
+                if (birdRight > pipe.x && birdLeft < pipe.x + pipe.width) {
+                    if (birdBottom > pipe.gapTop + pipe.gapHeight) {
+                        stopGame();
+                        return;
+                    }
+                }
+
+                // Score
+                if (!pipe.passed && birdLeft > pipe.x + pipe.width) {
+                    gameScore++;
+                    pipe.passed = true;
+                    updateScoreDisplay();
+                }
+
+                // Remove off-screen
+                if (pipe.x + pipe.width < 0) {
+                    pipes.splice(i, 1);
+                }
+            }
+        }
+
+        function spawnPipe() {
+            const gapHeight = 150; // Opening size
+            const minPipeHeight = 50;
+            const maxPipeHeight = gameCanvas.height - gapHeight - minPipeHeight;
+
+            const gapTop = Math.floor(Math.random() * (maxPipeHeight - minPipeHeight + 1)) + minPipeHeight;
+
+            pipes.push({
+                x: gameCanvas.width,
+                width: 60,
+                gapTop: gapTop,
+                gapHeight: gapHeight,
+                passed: false
+            });
+        }
+
+        function draw() {
+            // Background
+            ctx.fillStyle = '#87CEEB';
+            ctx.fillRect(0, 0, gameCanvas.width, gameCanvas.height);
+
+            // Draw Pipes (Marble Pillars)
+            ctx.fillStyle = '#f0f0f0'; // Marble white
+            ctx.strokeStyle = '#ccc';
+
+            pipes.forEach(pipe => {
+                // Top Pipe
+                ctx.fillRect(pipe.x, 0, pipe.width, pipe.gapTop);
+                ctx.strokeRect(pipe.x, 0, pipe.width, pipe.gapTop);
+
+                // Bottom Pipe
+                const bottomPipeY = pipe.gapTop + pipe.gapHeight;
+                const bottomPipeHeight = gameCanvas.height - bottomPipeY;
+                ctx.fillRect(pipe.x, bottomPipeY, pipe.width, bottomPipeHeight);
+                ctx.strokeRect(pipe.x, bottomPipeY, pipe.width, bottomPipeHeight);
+
+                // Add "Cross" detail to pillars (simple lines)
+                ctx.fillStyle = '#ddd';
+                // Top pillar decoration
+                ctx.fillRect(pipe.x + 10, pipe.gapTop - 40, 40, 5);
+                ctx.fillRect(pipe.x + 28, pipe.gapTop - 55, 5, 35);
+            });
+
+            // Draw Bird (Dove)
+            ctx.fillStyle = 'white';
+            ctx.beginPath();
+            ctx.arc(bird.x, bird.y, bird.radius, 0, Math.PI * 2);
+            ctx.fill();
+
+            // Wing
+            ctx.fillStyle = '#e0e0e0';
+            ctx.beginPath();
+            ctx.ellipse(bird.x - 5, bird.y + 5, 8, 5, Math.PI / 4, 0, Math.PI * 2);
+            ctx.fill();
+
+            // Eye
+            ctx.fillStyle = 'black';
+            ctx.beginPath();
+            ctx.arc(bird.x + 8, bird.y - 5, 2, 0, Math.PI * 2);
+            ctx.fill();
+        }
 
         // Init
         connect();
