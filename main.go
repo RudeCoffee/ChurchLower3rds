@@ -583,16 +583,14 @@ func handleControlWebSocket(w http.ResponseWriter, r *http.Request) {
 				Score int    `json:"score"`
 			}
 			if err := json.Unmarshal(rawMsg, &req); err == nil {
+				// Check if we need to update
 				highScoreMutex.Lock()
-				if req.Score > highScore {
-					highScore = req.Score
-					// Persist
-					go func(score int) {
-						err := os.WriteFile("highscore.txt", []byte(fmt.Sprintf("%d", score)), 0644)
-						if err != nil {
-							log.Printf("Error saving high score: %v", err)
-						}
-					}(req.Score)
+				currentHigh := highScore
+				highScoreMutex.Unlock()
+
+				if req.Score > currentHigh {
+					// Update and persist
+					saveHighScore(req.Score)
 
 					// Broadcast new high score to all control clients
 					updateMsg := struct {
@@ -600,7 +598,7 @@ func handleControlWebSocket(w http.ResponseWriter, r *http.Request) {
 						Score int    `json:"score"`
 					}{
 						Type:  "highscore_update",
-						Score: highScore,
+						Score: req.Score,
 					}
 
 					controlClientsMutex.Lock()
@@ -609,7 +607,6 @@ func handleControlWebSocket(w http.ResponseWriter, r *http.Request) {
 					}
 					controlClientsMutex.Unlock()
 				}
-				highScoreMutex.Unlock()
 			}
 
 		case "countdown":
