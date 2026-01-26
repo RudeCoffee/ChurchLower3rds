@@ -341,13 +341,15 @@ func getBookNames(filter string) []string {
 
 func getChapterNumbers(bookName string) []int {
 	var chapters []int
+	lowerBookName := strings.ToLower(bookName)
 
-	for _, book := range bibleData.Books {
-		if strings.EqualFold(book.Name, bookName) {
-			for _, chapter := range book.Chapters {
-				chapters = append(chapters, chapter.Chapter)
+	if bookChapters, ok := verseIndex[lowerBookName]; ok {
+		for i, verses := range bookChapters {
+			// Check if the chapter exists (non-nil slice of verses)
+			// verseIndex stores chapters at index [ChapterNum-1]
+			if verses != nil {
+				chapters = append(chapters, i+1)
 			}
-			break
 		}
 	}
 	return chapters

@@ -42,6 +42,41 @@ func TestSearchBible(t *testing.T) {
 	}
 }
 
+func TestGetChapterNumbers(t *testing.T) {
+	tests := []struct {
+		bookName     string
+		wantCount    int
+		checkChapter int // Check if this chapter exists in the list
+	}{
+		{"Genesis", 50, 1},
+		{"genesis", 50, 50},
+		{"Revelation", 22, 22},
+		{"Jude", 1, 1},
+		{"NonExistent", 0, 0},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.bookName, func(t *testing.T) {
+			chapters := getChapterNumbers(tt.bookName)
+			if len(chapters) != tt.wantCount {
+				t.Errorf("getChapterNumbers(%q) returned %d chapters, want %d", tt.bookName, len(chapters), tt.wantCount)
+			}
+			if tt.checkChapter > 0 {
+				found := false
+				for _, c := range chapters {
+					if c == tt.checkChapter {
+						found = true
+						break
+					}
+				}
+				if !found {
+					t.Errorf("getChapterNumbers(%q) did not contain chapter %d", tt.bookName, tt.checkChapter)
+				}
+			}
+		})
+	}
+}
+
 func BenchmarkSearchBible(b *testing.B) {
 	query := "love"
 	b.ResetTimer()
@@ -63,5 +98,13 @@ func BenchmarkSearchBibleComplex(b *testing.B) {
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
 		_ = searchBible(query)
+	}
+}
+
+func BenchmarkGetChapterNumbers(b *testing.B) {
+	book := "Revelation"
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		_ = getChapterNumbers(book)
 	}
 }
