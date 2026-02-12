@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"log"
 	"sync"
-	"unsafe"
 
 	"github.com/gen2brain/malgo"
 )
