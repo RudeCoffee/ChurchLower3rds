@@ -997,8 +997,23 @@ func startListening(deviceIndex int) {
 		return
 	}
 
+	log.Printf("Starting stream on device %d", deviceIndex)
+
+	// Create a counter for debug logging
+	var chunkCount uint64
+
 	err := audioInput.StartStream(deviceIndex, func(data []byte) {
+		chunkCount++
+		if chunkCount%100 == 0 {
+			// Log occasionally to verify data flow without spamming
+			// log.Printf("Processed 100 chunks of audio...")
+		}
+
 		partial, final, isFinal := speechEngine.ProcessAudio(data)
+
+		if isFinal {
+			log.Printf("Final Result: %s", final)
+		}
 
 		// Broadcast transcript
 		if partial != "" || final != "" {

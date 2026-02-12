@@ -1162,21 +1162,42 @@
             }
         }
 
+        let lastTranscriptTime = 0;
+
         function handleTranscriptUpdate(partial, final) {
             const box = document.getElementById('transcriptBox');
+
+            const status = document.getElementById('listeningStatus');
+            if (status && (partial || final)) {
+                if (status.textContent === "Listening...") {
+                     status.textContent = "Listening (Receiving speech)...";
+                }
+            }
+
             if (final) {
-                // box.textContent = final; // Or append?
-                // Let's show history of last few lines
-                box.innerHTML += `<div>${final}</div>`;
+                console.log("Final Transcript:", final);
+                // Remove any pending partial
+                const pending = document.getElementById('pendingTranscript');
+                if (pending) pending.remove();
+
+                const div = document.createElement('div');
+                div.textContent = final;
+                // div.style.color = 'var(--text-color)'; // Inherit
+                box.appendChild(div);
                 box.scrollTop = box.scrollHeight;
+
             } else if (partial) {
-                // Show partial as pending text
-                // Check if last element is pending class
-                // Implementation detail: for now just replacing text for simplicity or appending
-                 // Just show current partial at bottom
-                 // Ideally: clear box and show history + partial.
-                 // Simple: Just update box content to show what is happening.
-                 // If final, append. If partial, update status line.
+                // console.log("Partial Transcript:", partial); // Spammy
+                let pending = document.getElementById('pendingTranscript');
+                if (!pending) {
+                    pending = document.createElement('div');
+                    pending.id = 'pendingTranscript';
+                    pending.style.color = '#aaa'; // Grey for pending
+                    pending.style.fontStyle = 'italic';
+                    box.appendChild(pending);
+                }
+                pending.textContent = partial + "...";
+                box.scrollTop = box.scrollHeight;
             }
         }
 
