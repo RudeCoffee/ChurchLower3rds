@@ -425,7 +425,8 @@
             <!-- Navigation Header (Hidden on root) -->
             <div class="nav-header" id="bible-nav-header" style="display: none;">
                 <div class="nav-breadcrumbs" id="bible-breadcrumbs"></div>
-                <div style="margin-left: auto;">
+                <div style="margin-left: auto; display: flex; gap: 10px;">
+                    <button id="btn-mic-settings" onclick="openAudioSettings()" style="background: transparent; border: 1px solid var(--border-color); color: #888; padding: 5px 10px; border-radius: 4px; cursor: pointer; font-size: 20px;">⚙️</button>
                     <button id="btn-mic-toggle" onclick="toggleMic()" style="background: transparent; border: 1px solid var(--border-color); color: #888; padding: 5px 10px; border-radius: 4px; cursor: pointer; font-size: 20px;">🎙️</button>
                 </div>
             </div>
@@ -549,6 +550,19 @@
         </div>
     </div>
 
+    <!-- Audio Settings Modal (Touch) -->
+    <div id="audio-modal" class="game-overlay" style="display: none; background: rgba(0,0,0,0.85); z-index: 2000;">
+        <div style="background: var(--container-bg); padding: 20px; border-radius: 10px; width: 300px; max-width: 90%;">
+            <h2 style="margin-top: 0;">Audio Input</h2>
+            <select id="touchAudioDeviceSelect" style="width: 100%; padding: 15px; font-size: 18px; margin-bottom: 20px; background: var(--bg-color); color: white; border: 1px solid var(--border-color);"></select>
+
+            <div style="display: flex; gap: 10px;">
+                <button class="action-btn btn-display" style="flex: 1;" onclick="saveTouchAudioSettings()">Save</button>
+                <button class="action-btn btn-nav" style="flex: 1;" onclick="closeAudioModal()">Cancel</button>
+            </div>
+        </div>
+    </div>
+
     <div id="status-display" class="status-bar">Connecting...</div>
 
     <script>
@@ -655,6 +669,9 @@
                     break;
                 case 'verse_suggestion':
                     handleSuggestion(data);
+                    break;
+                case 'audio_devices':
+                    handleTouchAudioDevices(data.Devices);
                     break;
             }
         }
@@ -1059,18 +1076,74 @@
 
         // Search Logic
         // Voice Assistant
+        function openAudioSettings() {
+            const select = document.getElementById('touchAudioDeviceSelect');
+            select.innerHTML = '<option>Loading...</option>';
+
+            document.getElementById('audio-modal').style.display = 'flex';
+
+            if (ws && ws.readyState === WebSocket.OPEN) {
+                ws.send(JSON.stringify({ type: 'get_audio_devices' }));
+            }
+        }
+
+        function closeAudioModal() {
+            document.getElementById('audio-modal').style.display = 'none';
+        }
+
+        function handleTouchAudioDevices(devices) {
+            const select = document.getElementById('touchAudioDeviceSelect');
+            select.innerHTML = '';
+
+            if (!devices || devices.length === 0) {
+                const opt = document.createElement('option');
+                opt.text = "No devices found";
+                select.add(opt);
+                return;
+            }
+
+            devices.forEach(d => {
+                const opt = document.createElement('option');
+                opt.value = d.index;
+                opt.text = d.name;
+                select.add(opt);
+            });
+
+            // Pre-select saved device
+            const saved = localStorage.getItem('audioDeviceIndex');
+            if (saved !== null) {
+                select.value = saved;
+            }
+        }
+
+        function saveTouchAudioSettings() {
+            const select = document.getElementById('touchAudioDeviceSelect');
+            const index = parseInt(select.value);
+            localStorage.setItem('audioDeviceIndex', index);
+
+            // If already listening, restart
+            if (isListening) {
+                stopListening();
+                setTimeout(() => startListening(index), 500);
+            }
+
+            closeAudioModal();
+        }
+
         function toggleMic() {
             if (isListening) {
                 stopListening();
             } else {
-                startListening();
+                // Load saved index or default to 0
+                const saved = localStorage.getItem('audioDeviceIndex');
+                const index = saved !== null ? parseInt(saved) : 0;
+                startListening(index);
             }
         }
 
-        function startListening() {
+        function startListening(index = 0) {
             if (ws && ws.readyState === WebSocket.OPEN) {
-                // Use default device (0) to avoid CGO panic as per previous fix
-                ws.send(JSON.stringify({ type: 'start_listening', deviceIndex: 0 }));
+                ws.send(JSON.stringify({ type: 'start_listening', deviceIndex: index }));
                 isListening = true;
                 updateMicButton();
             }

@@ -5,7 +5,9 @@ package audio
 import (
 	"fmt"
 	"log"
+	"runtime"
 	"sync"
+	"unsafe"
 
 	"github.com/gen2brain/malgo"
 )
@@ -23,6 +25,7 @@ type AudioInput struct {
 	streamOpen bool
 	mu         sync.Mutex
 	callback   func([]byte)
+	pinner     *runtime.Pinner // Keep pinner to unpin later
 }
 
 // NewAudioInput creates a new audio input manager
@@ -46,6 +49,10 @@ func (ai *AudioInput) Close() {
 
 	if ai.streamOpen && ai.device != nil {
 		ai.device.Uninit()
+	}
+	if ai.pinner != nil {
+		ai.pinner.Unpin()
+		ai.pinner = nil
 	}
 	if ai.ctx != nil {
 		ai.ctx.Free() // Changed Uninit to Free for allocated context
@@ -78,6 +85,10 @@ func (ai *AudioInput) StartStream(deviceIndex int, callback func([]byte)) error 
 	// Stop existing stream if running
 	if ai.streamOpen {
 		ai.device.Uninit()
+		if ai.pinner != nil {
+			ai.pinner.Unpin()
+			ai.pinner = nil
+		}
 		ai.streamOpen = false
 	}
 
@@ -99,19 +110,16 @@ func (ai *AudioInput) StartStream(deviceIndex int, callback func([]byte)) error 
 	deviceConfig.Alsa.NoMMap = 1
 
 	// Set specific device ID
-	// Note: Passing a pointer to Go memory (devices slice or local var) to CGO via DeviceID
-	// causes a panic: "cgo argument has Go pointer to unpinned Go pointer".
-	// To fix this robustly without advanced CGO memory management, we default to nil (Default Device).
-	// If specific device selection is critical, we would need to allocate this in C memory.
-
-	// id := devices[deviceIndex].ID
-	// deviceConfig.Capture.DeviceID = unsafe.Pointer(&id)
-
-	deviceConfig.Capture.DeviceID = nil // Force default device
-	if deviceIndex != 0 {
-		log.Printf("Warning: Specific device selection is currently disabled to prevent crashes. Using default input device instead of index %d.", deviceIndex)
+	if deviceIndex == 0 {
+		deviceConfig.Capture.DeviceID = nil // Default device
+	} else {
+		// Use runtime.Pinner to ensure the Go pointer passed to CGO is pinned
+		id := devices[deviceIndex].ID
+		ai.pinner = new(runtime.Pinner)
+		ai.pinner.Pin(&id)
+		deviceConfig.Capture.DeviceID = unsafe.Pointer(&id)
+		log.Printf("Pinned device ID for device index %d", deviceIndex)
 	}
-
 
 	// Callback function for malgo
 	onRecv := func(pOutputSample, pInputSamples []byte, framecount uint32) {
@@ -130,12 +138,20 @@ func (ai *AudioInput) StartStream(deviceIndex int, callback func([]byte)) error 
 
 	device, err := malgo.InitDevice(ai.ctx.Context, deviceConfig, deviceCallbacks)
 	if err != nil {
+		if ai.pinner != nil {
+			ai.pinner.Unpin()
+			ai.pinner = nil
+		}
 		return fmt.Errorf("failed to init device: %v", err)
 	}
 
 	err = device.Start()
 	if err != nil {
 		device.Uninit()
+		if ai.pinner != nil {
+			ai.pinner.Unpin()
+			ai.pinner = nil
+		}
 		return fmt.Errorf("failed to start device: %v", err)
 	}
 
@@ -156,5 +172,10 @@ func (ai *AudioInput) StopStream() {
 		ai.device.Uninit()
 		ai.streamOpen = false
 		log.Println("Stopped audio stream")
+	}
+
+	if ai.pinner != nil {
+		ai.pinner.Unpin()
+		ai.pinner = nil
 	}
 }

@@ -1093,19 +1093,20 @@
                 select.add(option);
             });
 
+            // Pre-select saved device
+            const saved = localStorage.getItem('audioDeviceIndex');
+            if (saved !== null) {
+                select.value = saved;
+            }
+
             // Add note about default device
-            const note = document.createElement('div');
-            note.style.fontSize = '0.8em';
-            note.style.color = '#aaa';
-            note.style.marginTop = '5px';
-            note.textContent = "Note: Currently always uses the system default microphone to prevent crashes.";
-            const parent = select.parentElement;
-            if (parent) parent.appendChild(note);
+            // Removed note as we fixed the crash
         }
 
         function saveAudioSettings() {
             const select = document.getElementById('audioDeviceSelect');
             const deviceIndex = parseInt(select.value);
+            localStorage.setItem('audioDeviceIndex', deviceIndex);
 
             if (ws && ws.readyState === WebSocket.OPEN) {
                 // If we were listening, stop and restart
@@ -1146,10 +1147,13 @@
             if (isListening) {
                 stopListening();
             } else {
-                openAudioSettings(); // Force settings on start if not configured?
-                // Or just start with default/last used?
-                // Let's open settings to be safe for now, as we need to select device index.
-                // In future can save preference.
+                // Check if we have a saved device index
+                const saved = localStorage.getItem('audioDeviceIndex');
+                if (saved !== null) {
+                    startListening(parseInt(saved));
+                } else {
+                    openAudioSettings(); // Force settings if not configured
+                }
             }
         }
 
