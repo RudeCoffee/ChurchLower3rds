@@ -10,6 +10,7 @@ import (
 	"strconv"
 	"strings"
 	"sync"
+	"time"
 
 	"church-lower-thirds/audio"
 	"church-lower-thirds/search"
@@ -1001,6 +1002,7 @@ func startListening(deviceIndex int) {
 
 	// Create a counter for debug logging
 	var chunkCount uint64
+	var lastSearchTime time.Time
 
 	err := audioInput.StartStream(deviceIndex, func(data []byte) {
 		chunkCount++
@@ -1045,11 +1047,15 @@ func startListening(deviceIndex int) {
 		} else if len(partial) > 20 && strings.Count(partial, " ") >= 4 {
 			// If partial is > 20 chars and has at least 4 words, try to search it.
 			// This allows catching verses mid-sentence before the speaker pauses.
-			shouldSearch = true
-			searchText = partial
+			// THROTTLE: Only search partials every 750ms
+			if time.Since(lastSearchTime) > 750*time.Millisecond {
+				shouldSearch = true
+				searchText = partial
+			}
 		}
 
 		if shouldSearch && searchEngine != nil {
+			lastSearchTime = time.Now()
 			suggestions := searchEngine.Search(searchText)
 			if len(suggestions) > 0 {
 				top := suggestions[0]
