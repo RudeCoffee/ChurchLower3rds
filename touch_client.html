@@ -425,6 +425,9 @@
             <!-- Navigation Header (Hidden on root) -->
             <div class="nav-header" id="bible-nav-header" style="display: none;">
                 <div class="nav-breadcrumbs" id="bible-breadcrumbs"></div>
+                <div style="margin-left: auto;">
+                    <button id="btn-mic-toggle" onclick="toggleMic()" style="background: transparent; border: 1px solid var(--border-color); color: #888; padding: 5px 10px; border-radius: 4px; cursor: pointer; font-size: 20px;">🎙️</button>
+                </div>
             </div>
 
             <!-- Views -->
@@ -447,6 +450,19 @@
                 <div id="next-verse-preview" class="preview-box" style="margin-top: 10px; font-size: 18px; color: #aaa; border-color: #555; display: none; flex-grow: 0.5;">
                     <span class="preview-ref" id="next-preview-ref" style="font-size: 20px; color: #888;"></span>
                     <div id="next-preview-text"></div>
+                </div>
+
+                <!-- Suggested Verse Box -->
+                <div id="suggested-verse-box" class="preview-box" style="margin-top: 10px; font-size: 18px; color: #e0e0e0; border: 2px solid var(--accent-color); display: none; background-color: rgba(0, 124, 186, 0.1);">
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 5px;">
+                        <span style="font-size: 14px; font-weight: bold; color: var(--accent-color);">SUGGESTION <span id="suggestion-confidence" style="font-weight: normal; opacity: 0.8;"></span></span>
+                        <button onclick="dismissSuggestion()" style="background: transparent; border: none; color: #aaa; cursor: pointer; font-size: 16px;">✕</button>
+                    </div>
+                    <span class="preview-ref" id="suggestion-ref" style="font-size: 20px; color: white;"></span>
+                    <div id="suggestion-text" style="font-style: italic; margin-bottom: 10px;"></div>
+                    <div style="display: flex; gap: 10px;">
+                        <button class="action-btn btn-display" style="flex: 1; font-size: 16px; padding: 10px;" onclick="applySuggestion()">PREVIEW</button>
+                    </div>
                 </div>
 
                 <div class="control-actions">
@@ -547,6 +563,8 @@
         let isOutputActive = false;
         let isSpeakerLive = false;
         let searchTimeout = null;
+        let isListening = false;
+        let currentSuggestion = null;
 
         // Game State
         let gameCanvas, ctx;
@@ -634,6 +652,9 @@
                 case 'highscore_update':
                     highScore = data.score;
                     updateHighScoreDisplay();
+                    break;
+                case 'verse_suggestion':
+                    handleSuggestion(data);
                     break;
             }
         }
@@ -1037,6 +1058,88 @@
         }
 
         // Search Logic
+        // Voice Assistant
+        function toggleMic() {
+            if (isListening) {
+                stopListening();
+            } else {
+                startListening();
+            }
+        }
+
+        function startListening() {
+            if (ws && ws.readyState === WebSocket.OPEN) {
+                // Use default device (0) to avoid CGO panic as per previous fix
+                ws.send(JSON.stringify({ type: 'start_listening', deviceIndex: 0 }));
+                isListening = true;
+                updateMicButton();
+            }
+        }
+
+        function stopListening() {
+            if (ws && ws.readyState === WebSocket.OPEN) {
+                ws.send(JSON.stringify({ type: 'stop_listening' }));
+                isListening = false;
+                updateMicButton();
+            }
+        }
+
+        function updateMicButton() {
+            const btn = document.getElementById('btn-mic-toggle');
+            if (isListening) {
+                btn.textContent = "🔴";
+                btn.style.borderColor = "var(--danger-bg)";
+            } else {
+                btn.textContent = "🎙️";
+                btn.style.borderColor = "var(--border-color)";
+            }
+        }
+
+        function handleSuggestion(data) {
+            currentSuggestion = data.verse;
+
+            const box = document.getElementById('suggested-verse-box');
+            const ref = document.getElementById('suggestion-ref');
+            const text = document.getElementById('suggestion-text');
+            const conf = document.getElementById('suggestion-confidence');
+
+            ref.textContent = `${data.verse.book} ${data.verse.chapter}:${data.verse.verse}`;
+            text.textContent = data.verse.text;
+
+            if (data.confidence) {
+                conf.textContent = `(${data.confidence})`;
+            }
+
+            box.style.display = 'block';
+        }
+
+        function dismissSuggestion() {
+            document.getElementById('suggested-verse-box').style.display = 'none';
+        }
+
+        function applySuggestion() {
+            if (currentSuggestion) {
+                // Extract book name cleanly (removing 1/2/3 prefix issues if any, handled by server mostly)
+                // Using selectSearchResult logic but simplified
+                selectedBook = currentSuggestion.book;
+                selectedChapter = currentSuggestion.chapter;
+                selectedVerse = currentSuggestion.verse;
+
+                // Preview it (load control view)
+                if (ws && ws.readyState === WebSocket.OPEN) {
+                    ws.send(JSON.stringify({
+                        type: 'preview_verse',
+                        book: selectedBook,
+                        chapter: selectedChapter,
+                        verse: selectedVerse
+                    }));
+                }
+
+                // Dismiss suggestion after applying
+                dismissSuggestion();
+            }
+        }
+
         function debounceSearch() {
             clearTimeout(searchTimeout);
             searchTimeout = setTimeout(() => {
