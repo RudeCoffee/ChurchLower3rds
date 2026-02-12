@@ -100,16 +100,18 @@ func (ai *AudioInput) StartStream(deviceIndex int, callback func([]byte)) error 
 	deviceConfig.Alsa.NoMMap = 1
 
 	// Set specific device ID
-	// devices[deviceIndex].ID is typically [16]byte or similar
-	// We need to pass a pointer to it to DeviceConfig.Capture.DeviceID (usually `unsafe.Pointer`)
-	// Wait, malgo wrapper might handle this differently.
-	// Checking recent malgo docs (I recall ID is exported).
-	// Let's assume ID is accessible and construct the pointer manually if needed.
-	// But malgo.DeviceConfig usually takes a pointer.
-	// Let's try passing the address directly via unsafe.Pointer for now as malgo expects `unsafe.Pointer` usually.
+	// Note: Passing a pointer to Go memory (devices slice or local var) to CGO via DeviceID
+	// causes a panic: "cgo argument has Go pointer to unpinned Go pointer".
+	// To fix this robustly without advanced CGO memory management, we default to nil (Default Device).
+	// If specific device selection is critical, we would need to allocate this in C memory.
 
-	id := devices[deviceIndex].ID
-	deviceConfig.Capture.DeviceID = unsafe.Pointer(&id)
+	// id := devices[deviceIndex].ID
+	// deviceConfig.Capture.DeviceID = unsafe.Pointer(&id)
+
+	deviceConfig.Capture.DeviceID = nil // Force default device
+	if deviceIndex != 0 {
+		log.Printf("Warning: Specific device selection is currently disabled to prevent crashes. Using default input device instead of index %d.", deviceIndex)
+	}
 
 
 	// Callback function for malgo

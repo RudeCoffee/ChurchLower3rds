@@ -1092,6 +1092,15 @@
                 option.text = device.name;
                 select.add(option);
             });
+
+            // Add note about default device
+            const note = document.createElement('div');
+            note.style.fontSize = '0.8em';
+            note.style.color = '#aaa';
+            note.style.marginTop = '5px';
+            note.textContent = "Note: Currently always uses the system default microphone to prevent crashes.";
+            const parent = select.parentElement;
+            if (parent) parent.appendChild(note);
         }
 
         function saveAudioSettings() {
