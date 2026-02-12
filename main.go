@@ -1034,11 +1034,30 @@ func startListening(deviceIndex int) {
 			controlClientsMutex.Unlock()
 		}
 
-		// If final result, run search
-		if isFinal && searchEngine != nil && len(final) > 10 { // Ensure enough context
-			suggestions := searchEngine.Search(final)
+		// Run search on Final results OR long-enough Partial results
+		// We use a simple word count heuristic for partials to avoid spamming searches on "The..."
+		shouldSearch := false
+		searchText := ""
+
+		if isFinal && len(final) > 10 {
+			shouldSearch = true
+			searchText = final
+		} else if len(partial) > 20 && strings.Count(partial, " ") >= 4 {
+			// If partial is > 20 chars and has at least 4 words, try to search it.
+			// This allows catching verses mid-sentence before the speaker pauses.
+			shouldSearch = true
+			searchText = partial
+		}
+
+		if shouldSearch && searchEngine != nil {
+			suggestions := searchEngine.Search(searchText)
 			if len(suggestions) > 0 {
 				top := suggestions[0]
+
+				// For partial results, we might want a slightly higher confidence threshold
+				// to avoid jumping around too much?
+				// For now, let's just trust the search engine score.
+
 				// Broadcast suggestion
 				sugMsg := struct {
 					Type       string          `json:"type"`
