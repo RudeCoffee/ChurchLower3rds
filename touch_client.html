@@ -464,7 +464,8 @@
                         <span class="preview-ref" id="suggestion-ref" style="font-size: 20px; color: white;"></span>
                         <div id="suggestion-text" style="font-style: italic; margin-bottom: 10px;"></div>
                         <div style="display: flex; gap: 10px;">
-                            <button class="action-btn btn-display" style="flex: 1; font-size: 16px; padding: 10px;" onclick="applySuggestion()">PREVIEW</button>
+                            <button class="action-btn btn-nav" style="flex: 1; font-size: 16px; padding: 10px;" onclick="applySuggestion(false)">PREVIEW</button>
+                            <button class="action-btn btn-display" style="flex: 1; font-size: 16px; padding: 10px;" onclick="applySuggestion(true)">DISPLAY</button>
                         </div>
                     </div>
 
@@ -1222,25 +1223,31 @@
             document.getElementById('suggestion-confidence').textContent = '';
         }
 
-        function applySuggestion() {
+        function applySuggestion(goLive = false) {
             if (currentSuggestion) {
-                // Extract book name cleanly (removing 1/2/3 prefix issues if any, handled by server mostly)
-                // Using selectSearchResult logic but simplified
                 selectedBook = currentSuggestion.book;
                 selectedChapter = currentSuggestion.chapter;
                 selectedVerse = currentSuggestion.verse;
 
-                // Preview it (load control view)
-                if (ws && ws.readyState === WebSocket.OPEN) {
-                    ws.send(JSON.stringify({
-                        type: 'preview_verse',
-                        book: selectedBook,
-                        chapter: selectedChapter,
-                        verse: selectedVerse
-                    }));
+                // Explicitly reset live state for the new selection
+                // The new verse is NOT live yet unless goLive is true
+                isLive = false;
+
+                if (goLive) {
+                    displayVerse();
+                } else {
+                    // Preview it (load control view)
+                    if (ws && ws.readyState === WebSocket.OPEN) {
+                        ws.send(JSON.stringify({
+                            type: 'preview_verse',
+                            book: selectedBook,
+                            chapter: selectedChapter,
+                            verse: selectedVerse
+                        }));
+                    }
+                    updateButtons(); // Ensure buttons reflect isLive=false
                 }
 
-                // Dismiss suggestion after applying
                 dismissSuggestion();
             }
         }
