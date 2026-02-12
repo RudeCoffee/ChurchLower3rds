@@ -514,6 +514,7 @@
     <div id="audioModal" class="modal">
         <div class="modal-content">
             <div class="modal-header">Select Audio Input</div>
+            <div id="audioError" style="color: var(--danger-bg); margin-bottom: 10px; display: none;"></div>
             <div class="form-group">
                 <select id="audioDeviceSelect"></select>
             </div>
@@ -1031,7 +1032,17 @@
                         handleAudioDevices(data.Devices);
                         break;
                     case 'audio_error':
-                        alert("Audio Error: " + data.Error);
+                        console.error("Audio Error:", data.Error);
+                        const errDiv = document.getElementById('audioError');
+                        if (errDiv) {
+                            errDiv.textContent = data.Error;
+                            errDiv.style.display = 'block';
+                        }
+                        // Also update dropdown to indicate failure
+                        const select = document.getElementById('audioDeviceSelect');
+                        if (select) {
+                            select.innerHTML = '<option>Error loading devices</option>';
+                        }
                         break;
                     case 'transcript_update':
                         handleTranscriptUpdate(data.partial, data.final);
@@ -1046,10 +1057,17 @@
         // Voice Assistant Functions
 
         function openAudioSettings() {
+            const select = document.getElementById('audioDeviceSelect');
+            select.innerHTML = '';
+            const option = document.createElement('option');
+            option.text = "Loading devices...";
+            select.add(option);
+
             if (ws && ws.readyState === WebSocket.OPEN) {
                 ws.send(JSON.stringify({type: 'get_audio_devices'}));
             }
             document.getElementById('audioModal').classList.add('show');
+            document.getElementById('audioError').style.display = 'none';
         }
 
         function closeAudioModal() {
@@ -1057,6 +1075,7 @@
         }
 
         function handleAudioDevices(devices) {
+            console.log("Received audio devices:", devices);
             const select = document.getElementById('audioDeviceSelect');
             select.innerHTML = '';
 
@@ -1067,9 +1086,9 @@
                 return;
             }
 
-            devices.forEach((device, index) => {
+            devices.forEach((device) => {
                 const option = document.createElement('option');
-                option.value = index; // Use index as ID for now
+                option.value = device.index;
                 option.text = device.name;
                 select.add(option);
             });

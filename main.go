@@ -931,16 +931,29 @@ func handleControlWebSocket(w http.ResponseWriter, r *http.Request) {
 			}
 
 		case "get_audio_devices":
+			log.Println("Handling get_audio_devices request")
 			if audioInput == nil {
-				client.WriteJSON(struct{Type string; Error string}{Type: "audio_error", Error: "Audio input not initialized"})
+				log.Println("Audio input not initialized")
+				client.WriteJSON(struct {
+					Type  string `json:"type"`
+					Error string `json:"Error"`
+				}{Type: "audio_error", Error: "Audio input not initialized (Check server logs for startup errors)"})
 				continue
 			}
 			devices, err := audioInput.ListDevices()
 			if err != nil {
-				client.WriteJSON(struct{Type string; Error string}{Type: "audio_error", Error: err.Error()})
+				log.Printf("Error listing devices: %v", err)
+				client.WriteJSON(struct {
+					Type  string `json:"type"`
+					Error string `json:"Error"`
+				}{Type: "audio_error", Error: err.Error()})
 				continue
 			}
-			client.WriteJSON(struct{Type string; Devices []audio.DeviceInfo}{Type: "audio_devices", Devices: devices})
+			log.Printf("Sending %d audio devices to client", len(devices))
+			client.WriteJSON(struct {
+				Type    string             `json:"type"`
+				Devices []audio.DeviceInfo `json:"Devices"`
+			}{Type: "audio_devices", Devices: devices})
 
 		case "start_listening":
 			var req struct {
