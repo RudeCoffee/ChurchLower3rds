@@ -454,15 +454,23 @@
                 </div>
 
                 <!-- Suggested Verse Box -->
-                <div id="suggested-verse-box" class="preview-box" style="margin-top: 10px; font-size: 18px; color: #e0e0e0; border: 2px solid var(--accent-color); display: none; background-color: rgba(0, 124, 186, 0.1);">
+                <div id="suggested-verse-box" class="preview-box" style="margin-top: 10px; font-size: 18px; color: #e0e0e0; border: 2px solid var(--accent-color); display: none; background-color: rgba(0, 124, 186, 0.1); min-height: 150px;">
                     <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 5px;">
-                        <span style="font-size: 14px; font-weight: bold; color: var(--accent-color);">SUGGESTION <span id="suggestion-confidence" style="font-weight: normal; opacity: 0.8;"></span></span>
+                        <span style="font-size: 14px; font-weight: bold; color: var(--accent-color);">VOICE ASSISTANT <span id="suggestion-confidence" style="font-weight: normal; opacity: 0.8;"></span></span>
                         <button onclick="dismissSuggestion()" style="background: transparent; border: none; color: #aaa; cursor: pointer; font-size: 16px;">✕</button>
                     </div>
-                    <span class="preview-ref" id="suggestion-ref" style="font-size: 20px; color: white;"></span>
-                    <div id="suggestion-text" style="font-style: italic; margin-bottom: 10px;"></div>
-                    <div style="display: flex; gap: 10px;">
-                        <button class="action-btn btn-display" style="flex: 1; font-size: 16px; padding: 10px;" onclick="applySuggestion()">PREVIEW</button>
+
+                    <div id="suggestion-content" style="display: none;">
+                        <span class="preview-ref" id="suggestion-ref" style="font-size: 20px; color: white;"></span>
+                        <div id="suggestion-text" style="font-style: italic; margin-bottom: 10px;"></div>
+                        <div style="display: flex; gap: 10px;">
+                            <button class="action-btn btn-display" style="flex: 1; font-size: 16px; padding: 10px;" onclick="applySuggestion()">PREVIEW</button>
+                        </div>
+                    </div>
+
+                    <div id="suggestion-placeholder" style="display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100px; color: #888;">
+                        <div style="font-size: 24px; margin-bottom: 10px;">🎙️</div>
+                        <div>Listening for scripture...</div>
                     </div>
                 </div>
 
@@ -1146,6 +1154,10 @@
                 ws.send(JSON.stringify({ type: 'start_listening', deviceIndex: index }));
                 isListening = true;
                 updateMicButton();
+
+                // Show box immediately in placeholder state
+                document.getElementById('suggested-verse-box').style.display = 'block';
+                showSuggestionPlaceholder();
             }
         }
 
@@ -1154,6 +1166,9 @@
                 ws.send(JSON.stringify({ type: 'stop_listening' }));
                 isListening = false;
                 updateMicButton();
+
+                // Hide box when stopped
+                document.getElementById('suggested-verse-box').style.display = 'none';
             }
         }
 
@@ -1172,6 +1187,9 @@
             currentSuggestion = data.verse;
 
             const box = document.getElementById('suggested-verse-box');
+            const content = document.getElementById('suggestion-content');
+            const placeholder = document.getElementById('suggestion-placeholder');
+
             const ref = document.getElementById('suggestion-ref');
             const text = document.getElementById('suggestion-text');
             const conf = document.getElementById('suggestion-confidence');
@@ -1183,11 +1201,25 @@
                 conf.textContent = `(${data.confidence})`;
             }
 
+            // Switch to content view
             box.style.display = 'block';
+            content.style.display = 'block';
+            placeholder.style.display = 'none';
         }
 
         function dismissSuggestion() {
-            document.getElementById('suggested-verse-box').style.display = 'none';
+            // If listening, revert to placeholder instead of hiding
+            if (isListening) {
+                showSuggestionPlaceholder();
+            } else {
+                document.getElementById('suggested-verse-box').style.display = 'none';
+            }
+        }
+
+        function showSuggestionPlaceholder() {
+            document.getElementById('suggestion-content').style.display = 'none';
+            document.getElementById('suggestion-placeholder').style.display = 'flex';
+            document.getElementById('suggestion-confidence').textContent = '';
         }
 
         function applySuggestion() {
