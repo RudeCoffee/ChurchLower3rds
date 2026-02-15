@@ -451,6 +451,23 @@
             border-radius: 4px;
             margin-top: 10px;
             display: none;
+            height: 200px; /* Fixed height to prevent bouncing */
+            overflow-y: auto;
+            position: relative;
+        }
+
+        .suggestion-placeholder-content {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            height: 100%;
+            color: #888;
+            font-style: italic;
+            text-align: center;
+        }
+
+        .suggestion-content {
+            display: none; /* Hidden by default until suggestion arrives */
         }
 
         .suggestion-header {
@@ -545,16 +562,21 @@
         </div>
 
         <div class="suggestion-card" id="suggestionCard">
-            <div class="suggestion-header">
-                <span style="font-weight: bold; color: var(--button-bg);">Suggested Verse:</span>
-                <span class="confidence-badge" id="suggestionConfidence">High Confidence</span>
+            <div id="suggestionPlaceholder" class="suggestion-placeholder-content">
+                Waiting for verse suggestion...
             </div>
-            <h3 id="suggestionReference" style="margin: 5px 0;"></h3>
-            <div id="suggestionText" class="verse-text" style="font-size: 0.9em; margin-bottom: 10px;"></div>
-            <div>
-                <button onclick="previewSuggestion()">Preview</button>
-                <button onclick="displaySuggestion()">Display Live</button>
-                <button onclick="dismissSuggestion()" style="background-color: #6c757d;">Dismiss</button>
+            <div id="suggestionContent" class="suggestion-content">
+                <div class="suggestion-header">
+                    <span style="font-weight: bold; color: var(--button-bg);">Suggested Verse:</span>
+                    <span class="confidence-badge" id="suggestionConfidence">High Confidence</span>
+                </div>
+                <h3 id="suggestionReference" style="margin: 5px 0;"></h3>
+                <div id="suggestionText" class="verse-text" style="font-size: 0.9em; margin-bottom: 10px;"></div>
+                <div>
+                    <button onclick="previewSuggestion()">Preview</button>
+                    <button onclick="displaySuggestion()">Display Live</button>
+                    <button onclick="dismissSuggestion()" style="background-color: #6c757d;">Dismiss</button>
+                </div>
             </div>
         </div>
     </div>
@@ -1128,6 +1150,7 @@
                     type: 'start_listening',
                     deviceIndex: deviceIndex
                 }));
+                resetSuggestionCard();
                 isListening = true;
                 updateListeningUI();
             }
@@ -1161,17 +1184,20 @@
             const btn = document.getElementById('listenBtn');
             const indicator = document.getElementById('listeningIndicator');
             const status = document.getElementById('listeningStatus');
+            const card = document.getElementById('suggestionCard');
 
             if (isListening) {
                 btn.textContent = "Stop Listening";
                 btn.classList.add('hide');
                 indicator.classList.add('active');
                 status.textContent = "Listening...";
+                card.style.display = 'block';
             } else {
                 btn.textContent = "Start Listening";
                 btn.classList.remove('hide');
                 indicator.classList.remove('active');
                 status.textContent = "Not Listening";
+                card.style.display = 'none';
             }
         }
 
@@ -1217,7 +1243,6 @@
         function handleVerseSuggestion(data) {
             suggestedVerse = data.verse;
 
-            const card = document.getElementById('suggestionCard');
             const ref = document.getElementById('suggestionReference');
             const text = document.getElementById('suggestionText');
             const conf = document.getElementById('suggestionConfidence');
@@ -1232,11 +1257,19 @@
             else if (data.confidence === 'Medium') conf.classList.add('confidence-medium');
             else conf.classList.add('confidence-low');
 
-            card.style.display = 'block';
+            // Show content, hide placeholder
+            document.getElementById('suggestionPlaceholder').style.display = 'none';
+            document.getElementById('suggestionContent').style.display = 'block';
         }
 
         function dismissSuggestion() {
-            document.getElementById('suggestionCard').style.display = 'none';
+            resetSuggestionCard();
+        }
+
+        function resetSuggestionCard() {
+            suggestedVerse = null;
+            document.getElementById('suggestionPlaceholder').style.display = 'flex';
+            document.getElementById('suggestionContent').style.display = 'none';
         }
 
         function previewSuggestion() {
