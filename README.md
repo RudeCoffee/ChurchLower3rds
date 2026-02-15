@@ -37,6 +37,8 @@ A real-time Bible verse and speaker name display system for OBS (Open Broadcaste
 
 ### Setup Instructions
 
+> **Steam Deck Users:** Please see our dedicated [Steam Deck Setup Guide](STEAM_DECK.md) for step-by-step instructions.
+
 1.  **Clone the repository**
     ```bash
     git clone https://github.com/RudeCoffee/ChurchLower3rds.git
