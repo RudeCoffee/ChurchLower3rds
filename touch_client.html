@@ -71,7 +71,7 @@
         /* Main Content */
         .main-content {
             flex-grow: 1;
-            padding: 20px;
+            padding: 10px;
             overflow-y: auto;
             display: flex;
             flex-direction: column;
@@ -187,30 +187,34 @@
 
         .preview-box {
             background-color: var(--container-bg);
-            padding: 20px;
+            padding: 15px;
             border-radius: 8px;
-            margin-bottom: 20px;
+            margin-bottom: 15px;
             flex-grow: 1;
-            font-size: 24px;
-            line-height: 1.5;
+            font-size: 28px;
+            line-height: 1.4;
             overflow-y: auto;
-            border: 2px solid var(--border-color);
+            border: none;
         }
 
         .preview-ref {
             font-weight: bold;
-            color: var(--accent-color);
-            margin-bottom: 10px;
+            color: white;
+            margin-bottom: 5px;
             display: block;
-            font-size: 28px;
+            font-size: 32px;
+        }
+
+        #preview-text {
+            color: white;
         }
 
         .control-actions {
             display: grid;
             grid-template-columns: 1fr 2fr 1fr;
-            gap: 20px;
+            gap: 10px;
             margin-top: auto;
-            height: 100px;
+            height: 90px;
         }
 
         .action-btn {
@@ -425,6 +429,10 @@
             <!-- Navigation Header (Hidden on root) -->
             <div class="nav-header" id="bible-nav-header" style="display: none;">
                 <div class="nav-breadcrumbs" id="bible-breadcrumbs"></div>
+                <div style="margin-left: auto; display: flex; gap: 10px;">
+                    <button id="btn-mic-settings" onclick="openAudioSettings()" style="background: transparent; border: 1px solid var(--border-color); color: #888; padding: 5px 10px; border-radius: 4px; cursor: pointer; font-size: 20px;">⚙️</button>
+                    <button id="btn-mic-toggle" onclick="toggleMic()" style="background: transparent; border: 1px solid var(--border-color); color: #888; padding: 5px 10px; border-radius: 4px; cursor: pointer; font-size: 20px;">🎙️</button>
+                </div>
             </div>
 
             <!-- Views -->
@@ -447,6 +455,28 @@
                 <div id="next-verse-preview" class="preview-box" style="margin-top: 10px; font-size: 18px; color: #aaa; border-color: #555; display: none; flex-grow: 0.5;">
                     <span class="preview-ref" id="next-preview-ref" style="font-size: 20px; color: #888;"></span>
                     <div id="next-preview-text"></div>
+                </div>
+
+                <!-- Suggested Verse Box -->
+                <div id="suggested-verse-box" class="preview-box" style="margin-top: 10px; font-size: 18px; color: #e0e0e0; border: 2px solid var(--accent-color); display: none; background-color: rgba(0, 124, 186, 0.1); min-height: 150px;">
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 5px;">
+                        <span style="font-size: 14px; font-weight: bold; color: var(--accent-color);">VOICE ASSISTANT <span id="suggestion-confidence" style="font-weight: normal; opacity: 0.8;"></span></span>
+                        <button onclick="dismissSuggestion()" style="background: transparent; border: none; color: #aaa; cursor: pointer; font-size: 16px;">✕</button>
+                    </div>
+
+                    <div id="suggestion-content" style="display: none;">
+                        <span class="preview-ref" id="suggestion-ref" style="font-size: 20px; color: white;"></span>
+                        <div id="suggestion-text" style="font-style: italic; margin-bottom: 10px;"></div>
+                        <div style="display: flex; gap: 10px;">
+                            <button class="action-btn btn-nav" style="flex: 1; font-size: 16px; padding: 10px;" onclick="applySuggestion(false)">PREVIEW</button>
+                            <button class="action-btn btn-display" style="flex: 1; font-size: 16px; padding: 10px;" onclick="applySuggestion(true)">DISPLAY</button>
+                        </div>
+                    </div>
+
+                    <div id="suggestion-placeholder" style="display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100px; color: #888;">
+                        <div style="font-size: 24px; margin-bottom: 10px;">🎙️</div>
+                        <div>Listening for scripture...</div>
+                    </div>
                 </div>
 
                 <div class="control-actions">
@@ -533,6 +563,19 @@
         </div>
     </div>
 
+    <!-- Audio Settings Modal (Touch) -->
+    <div id="audio-modal" class="game-overlay" style="display: none; background: rgba(0,0,0,0.85); z-index: 2000;">
+        <div style="background: var(--container-bg); padding: 20px; border-radius: 10px; width: 300px; max-width: 90%;">
+            <h2 style="margin-top: 0;">Audio Input</h2>
+            <select id="touchAudioDeviceSelect" style="width: 100%; padding: 15px; font-size: 18px; margin-bottom: 20px; background: var(--bg-color); color: white; border: 1px solid var(--border-color);"></select>
+
+            <div style="display: flex; gap: 10px;">
+                <button class="action-btn btn-display" style="flex: 1;" onclick="saveTouchAudioSettings()">Save</button>
+                <button class="action-btn btn-nav" style="flex: 1;" onclick="closeAudioModal()">Cancel</button>
+            </div>
+        </div>
+    </div>
+
     <div id="status-display" class="status-bar">Connecting...</div>
 
     <script>
@@ -547,6 +590,8 @@
         let isOutputActive = false;
         let isSpeakerLive = false;
         let searchTimeout = null;
+        let isListening = false;
+        let currentSuggestion = null;
 
         // Game State
         let gameCanvas, ctx;
@@ -634,6 +679,12 @@
                 case 'highscore_update':
                     highScore = data.score;
                     updateHighScoreDisplay();
+                    break;
+                case 'verse_suggestion':
+                    handleSuggestion(data);
+                    break;
+                case 'audio_devices':
+                    handleTouchAudioDevices(data.Devices);
                     break;
             }
         }
@@ -1037,6 +1088,174 @@
         }
 
         // Search Logic
+        // Voice Assistant
+        function openAudioSettings() {
+            const select = document.getElementById('touchAudioDeviceSelect');
+            select.innerHTML = '<option>Loading...</option>';
+
+            document.getElementById('audio-modal').style.display = 'flex';
+
+            if (ws && ws.readyState === WebSocket.OPEN) {
+                ws.send(JSON.stringify({ type: 'get_audio_devices' }));
+            }
+        }
+
+        function closeAudioModal() {
+            document.getElementById('audio-modal').style.display = 'none';
+        }
+
+        function handleTouchAudioDevices(devices) {
+            const select = document.getElementById('touchAudioDeviceSelect');
+            select.innerHTML = '';
+
+            if (!devices || devices.length === 0) {
+                const opt = document.createElement('option');
+                opt.text = "No devices found";
+                select.add(opt);
+                return;
+            }
+
+            devices.forEach(d => {
+                const opt = document.createElement('option');
+                opt.value = d.index;
+                opt.text = d.name;
+                select.add(opt);
+            });
+
+            // Pre-select saved device
+            const saved = localStorage.getItem('audioDeviceIndex');
+            if (saved !== null) {
+                select.value = saved;
+            }
+        }
+
+        function saveTouchAudioSettings() {
+            const select = document.getElementById('touchAudioDeviceSelect');
+            const index = parseInt(select.value);
+            localStorage.setItem('audioDeviceIndex', index);
+
+            // If already listening, restart
+            if (isListening) {
+                stopListening();
+                setTimeout(() => startListening(index), 500);
+            }
+
+            closeAudioModal();
+        }
+
+        function toggleMic() {
+            if (isListening) {
+                stopListening();
+            } else {
+                // Load saved index or default to 0
+                const saved = localStorage.getItem('audioDeviceIndex');
+                const index = saved !== null ? parseInt(saved) : 0;
+                startListening(index);
+            }
+        }
+
+        function startListening(index = 0) {
+            if (ws && ws.readyState === WebSocket.OPEN) {
+                ws.send(JSON.stringify({ type: 'start_listening', deviceIndex: index }));
+                isListening = true;
+                updateMicButton();
+
+                // Show box immediately in placeholder state
+                document.getElementById('suggested-verse-box').style.display = 'block';
+                showSuggestionPlaceholder();
+            }
+        }
+
+        function stopListening() {
+            if (ws && ws.readyState === WebSocket.OPEN) {
+                ws.send(JSON.stringify({ type: 'stop_listening' }));
+                isListening = false;
+                updateMicButton();
+
+                // Hide box when stopped
+                document.getElementById('suggested-verse-box').style.display = 'none';
+            }
+        }
+
+        function updateMicButton() {
+            const btn = document.getElementById('btn-mic-toggle');
+            if (isListening) {
+                btn.textContent = "🔴";
+                btn.style.borderColor = "var(--danger-bg)";
+            } else {
+                btn.textContent = "🎙️";
+                btn.style.borderColor = "var(--border-color)";
+            }
+        }
+
+        function handleSuggestion(data) {
+            currentSuggestion = data.verse;
+
+            const box = document.getElementById('suggested-verse-box');
+            const content = document.getElementById('suggestion-content');
+            const placeholder = document.getElementById('suggestion-placeholder');
+
+            const ref = document.getElementById('suggestion-ref');
+            const text = document.getElementById('suggestion-text');
+            const conf = document.getElementById('suggestion-confidence');
+
+            ref.textContent = `${data.verse.book} ${data.verse.chapter}:${data.verse.verse}`;
+            text.textContent = data.verse.text;
+
+            if (data.confidence) {
+                conf.textContent = `(${data.confidence})`;
+            }
+
+            // Switch to content view
+            box.style.display = 'block';
+            content.style.display = 'block';
+            placeholder.style.display = 'none';
+        }
+
+        function dismissSuggestion() {
+            // If listening, revert to placeholder instead of hiding
+            if (isListening) {
+                showSuggestionPlaceholder();
+            } else {
+                document.getElementById('suggested-verse-box').style.display = 'none';
+            }
+        }
+
+        function showSuggestionPlaceholder() {
+            document.getElementById('suggestion-content').style.display = 'none';
+            document.getElementById('suggestion-placeholder').style.display = 'flex';
+            document.getElementById('suggestion-confidence').textContent = '';
+        }
+
+        function applySuggestion(goLive = false) {
+            if (currentSuggestion) {
+                selectedBook = currentSuggestion.book;
+                selectedChapter = currentSuggestion.chapter;
+                selectedVerse = currentSuggestion.verse;
+
+                // Explicitly reset live state for the new selection
+                // The new verse is NOT live yet unless goLive is true
+                isLive = false;
+
+                if (goLive) {
+                    displayVerse();
+                } else {
+                    // Preview it (load control view)
+                    if (ws && ws.readyState === WebSocket.OPEN) {
+                        ws.send(JSON.stringify({
+                            type: 'preview_verse',
+                            book: selectedBook,
+                            chapter: selectedChapter,
+                            verse: selectedVerse
+                        }));
+                    }
+                    updateButtons(); // Ensure buttons reflect isLive=false
+                }
+
+                dismissSuggestion();
+            }
+        }
+
         function debounceSearch() {
             clearTimeout(searchTimeout);
             searchTimeout = setTimeout(() => {

@@ -396,6 +396,129 @@
             border-color: var(--button-bg);
             outline: 2px solid var(--button-bg);
         }
+
+        /* Voice Assistant Styles */
+        .assistant-container {
+            border: 2px solid var(--button-bg);
+            position: relative;
+        }
+
+        .assistant-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 10px;
+        }
+
+        .listening-indicator {
+            display: inline-block;
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+            background-color: #6c757d;
+            margin-right: 8px;
+        }
+
+        .listening-indicator.active {
+            background-color: var(--danger-bg);
+            box-shadow: 0 0 5px var(--danger-bg);
+            animation: pulse 1.5s infinite;
+        }
+
+        @keyframes pulse {
+            0% { transform: scale(0.95); opacity: 0.7; }
+            50% { transform: scale(1.05); opacity: 1; }
+            100% { transform: scale(0.95); opacity: 0.7; }
+        }
+
+        .transcript-box {
+            background-color: var(--input-bg);
+            border: 1px solid var(--border-color);
+            padding: 10px;
+            border-radius: 4px;
+            height: 60px;
+            overflow-y: auto;
+            font-size: 0.9em;
+            color: var(--text-color);
+            margin-bottom: 10px;
+            font-style: italic;
+        }
+
+        .suggestion-card {
+            background-color: var(--preview-bg);
+            border: 1px solid var(--button-bg);
+            padding: 15px;
+            border-radius: 4px;
+            margin-top: 10px;
+            display: none;
+            height: 200px; /* Fixed height to prevent bouncing */
+            overflow-y: auto;
+            position: relative;
+        }
+
+        .suggestion-placeholder-content {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            height: 100%;
+            color: #888;
+            font-style: italic;
+            text-align: center;
+        }
+
+        .suggestion-content {
+            display: none; /* Hidden by default until suggestion arrives */
+        }
+
+        .suggestion-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 5px;
+        }
+
+        .confidence-badge {
+            font-size: 0.8em;
+            padding: 2px 6px;
+            border-radius: 10px;
+            background-color: #6c757d;
+            color: white;
+        }
+
+        .confidence-high { background-color: var(--success-bg); }
+        .confidence-medium { background-color: #fd7e14; }
+        .confidence-low { background-color: #dc3545; }
+
+        .modal {
+            display: none;
+            position: fixed;
+            z-index: 3000;
+            left: 0;
+            top: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0,0,0,0.5);
+            align-items: center;
+            justify-content: center;
+        }
+
+        .modal.show {
+            display: flex;
+        }
+
+        .modal-content {
+            background-color: var(--container-bg);
+            padding: 20px;
+            border-radius: 8px;
+            width: 300px;
+            max-width: 90%;
+        }
+
+        .modal-header {
+            margin-bottom: 15px;
+            font-weight: bold;
+            font-size: 1.2em;
+        }
     </style>
 </head>
 
@@ -404,10 +527,63 @@
 
     <div class="status" id="status">Connecting...</div>
 
-    <div class="container" style="position: relative; z-index: 10;">
-        <h1>Church Lower 3rds Control</h1>
+    <!-- Audio Settings Modal -->
+    <div id="audioModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">Select Audio Input</div>
+            <div id="audioError" style="color: var(--danger-bg); margin-bottom: 10px; display: none;"></div>
+            <div class="form-group">
+                <select id="audioDeviceSelect"></select>
+            </div>
+            <div style="text-align: right;">
+                <button onclick="saveAudioSettings()">Save & Start</button>
+                <button onclick="closeAudioModal()" style="background-color: #6c757d;">Cancel</button>
+            </div>
+        </div>
+    </div>
 
-        <h2>Bible Verse Display</h2>
+    <!-- Voice Assistant Section -->
+    <div class="container assistant-container">
+        <div class="assistant-header">
+            <h2>🎙️ Voice Assistant</h2>
+            <div>
+                <button onclick="openAudioSettings()" style="padding: 5px 10px; font-size: 12px;">⚙️</button>
+            </div>
+        </div>
+
+        <div style="margin-bottom: 10px;">
+            <div class="listening-indicator" id="listeningIndicator"></div>
+            <span id="listeningStatus">Not Listening</span>
+            <button id="listenBtn" onclick="toggleListening()" style="margin-left: 10px; padding: 5px 10px;">Start Listening</button>
+        </div>
+
+        <div class="transcript-box" id="transcriptBox">
+            Listening for scripture...
+        </div>
+
+        <div class="suggestion-card" id="suggestionCard">
+            <div id="suggestionPlaceholder" class="suggestion-placeholder-content">
+                Waiting for verse suggestion...
+            </div>
+            <div id="suggestionContent" class="suggestion-content">
+                <div class="suggestion-header">
+                    <span style="font-weight: bold; color: var(--button-bg);">Suggested Verse:</span>
+                    <span class="confidence-badge" id="suggestionConfidence">High Confidence</span>
+                </div>
+                <h3 id="suggestionReference" style="margin: 5px 0;"></h3>
+                <div id="suggestionText" class="verse-text" style="font-size: 0.9em; margin-bottom: 10px;"></div>
+                <div>
+                    <button onclick="previewSuggestion()">Preview</button>
+                    <button onclick="displaySuggestion()">Display Live</button>
+                    <button onclick="dismissSuggestion()" style="background-color: #6c757d;">Dismiss</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="container" style="position: relative; z-index: 10;">
+        <h1>Bible Verse Display</h1>
+
         <div class="verse-selector">
             <div class="selector-container">
                 <label for="bookInput">Book</label>
@@ -521,6 +697,10 @@
 
         let shouldOpenChapterGrid = false;
         let shouldOpenVerseGrid = false;
+
+        // Voice Assistant Variables
+        let isListening = false;
+        let suggestedVerse = null;
 
         // Overlay Management
         function showOverlay(id) {
@@ -870,9 +1050,245 @@
                     case 'speakers_response':
                         handleSpeakersResponse(data.speakers);
                         break;
+                    case 'audio_devices':
+                        handleAudioDevices(data.Devices);
+                        break;
+                    case 'audio_error':
+                        console.error("Audio Error:", data.Error);
+                        const errDiv = document.getElementById('audioError');
+                        if (errDiv) {
+                            errDiv.textContent = data.Error;
+                            errDiv.style.display = 'block';
+                        }
+                        // Also update dropdown to indicate failure
+                        const select = document.getElementById('audioDeviceSelect');
+                        if (select) {
+                            select.innerHTML = '<option>Error loading devices</option>';
+                        }
+                        break;
+                    case 'transcript_update':
+                        handleTranscriptUpdate(data.partial, data.final);
+                        break;
+                    case 'verse_suggestion':
+                        handleVerseSuggestion(data);
+                        break;
                 }
             };
         }
+
+        // Voice Assistant Functions
+
+        function openAudioSettings() {
+            const select = document.getElementById('audioDeviceSelect');
+            select.innerHTML = '';
+            const option = document.createElement('option');
+            option.text = "Loading devices...";
+            select.add(option);
+
+            if (ws && ws.readyState === WebSocket.OPEN) {
+                ws.send(JSON.stringify({type: 'get_audio_devices'}));
+            }
+            document.getElementById('audioModal').classList.add('show');
+            document.getElementById('audioError').style.display = 'none';
+        }
+
+        function closeAudioModal() {
+            document.getElementById('audioModal').classList.remove('show');
+        }
+
+        function handleAudioDevices(devices) {
+            console.log("Received audio devices:", devices);
+            const select = document.getElementById('audioDeviceSelect');
+            select.innerHTML = '';
+
+            if (!devices || devices.length === 0) {
+                const option = document.createElement('option');
+                option.text = "No devices found";
+                select.add(option);
+                return;
+            }
+
+            devices.forEach((device) => {
+                const option = document.createElement('option');
+                option.value = device.index;
+                option.text = device.name;
+                select.add(option);
+            });
+
+            // Pre-select saved device
+            const saved = localStorage.getItem('audioDeviceIndex');
+            if (saved !== null) {
+                select.value = saved;
+            }
+
+            // Add note about default device
+            // Removed note as we fixed the crash
+        }
+
+        function saveAudioSettings() {
+            const select = document.getElementById('audioDeviceSelect');
+            const deviceIndex = parseInt(select.value);
+            localStorage.setItem('audioDeviceIndex', deviceIndex);
+
+            if (ws && ws.readyState === WebSocket.OPEN) {
+                // If we were listening, stop and restart
+                if (isListening) {
+                    toggleListening(); // Stop
+                    setTimeout(() => {
+                        startListening(deviceIndex);
+                    }, 500);
+                } else {
+                    startListening(deviceIndex);
+                }
+            }
+            closeAudioModal();
+        }
+
+        function startListening(deviceIndex) {
+            if (ws && ws.readyState === WebSocket.OPEN) {
+                ws.send(JSON.stringify({
+                    type: 'start_listening',
+                    deviceIndex: deviceIndex
+                }));
+                resetSuggestionCard();
+                isListening = true;
+                updateListeningUI();
+            }
+        }
+
+        function stopListening() {
+            if (ws && ws.readyState === WebSocket.OPEN) {
+                ws.send(JSON.stringify({
+                    type: 'stop_listening'
+                }));
+                isListening = false;
+                updateListeningUI();
+            }
+        }
+
+        function toggleListening() {
+            if (isListening) {
+                stopListening();
+            } else {
+                // Check if we have a saved device index
+                const saved = localStorage.getItem('audioDeviceIndex');
+                if (saved !== null) {
+                    startListening(parseInt(saved));
+                } else {
+                    openAudioSettings(); // Force settings if not configured
+                }
+            }
+        }
+
+        function updateListeningUI() {
+            const btn = document.getElementById('listenBtn');
+            const indicator = document.getElementById('listeningIndicator');
+            const status = document.getElementById('listeningStatus');
+            const card = document.getElementById('suggestionCard');
+
+            if (isListening) {
+                btn.textContent = "Stop Listening";
+                btn.classList.add('hide');
+                indicator.classList.add('active');
+                status.textContent = "Listening...";
+                card.style.display = 'block';
+            } else {
+                btn.textContent = "Start Listening";
+                btn.classList.remove('hide');
+                indicator.classList.remove('active');
+                status.textContent = "Not Listening";
+                card.style.display = 'none';
+            }
+        }
+
+        let lastTranscriptTime = 0;
+
+        function handleTranscriptUpdate(partial, final) {
+            const box = document.getElementById('transcriptBox');
+
+            const status = document.getElementById('listeningStatus');
+            if (status && (partial || final)) {
+                if (status.textContent === "Listening...") {
+                     status.textContent = "Listening (Receiving speech)...";
+                }
+            }
+
+            if (final) {
+                console.log("Final Transcript:", final);
+                // Remove any pending partial
+                const pending = document.getElementById('pendingTranscript');
+                if (pending) pending.remove();
+
+                const div = document.createElement('div');
+                div.textContent = final;
+                // div.style.color = 'var(--text-color)'; // Inherit
+                box.appendChild(div);
+                box.scrollTop = box.scrollHeight;
+
+            } else if (partial) {
+                // console.log("Partial Transcript:", partial); // Spammy
+                let pending = document.getElementById('pendingTranscript');
+                if (!pending) {
+                    pending = document.createElement('div');
+                    pending.id = 'pendingTranscript';
+                    pending.style.color = '#aaa'; // Grey for pending
+                    pending.style.fontStyle = 'italic';
+                    box.appendChild(pending);
+                }
+                pending.textContent = partial + "...";
+                box.scrollTop = box.scrollHeight;
+            }
+        }
+
+        function handleVerseSuggestion(data) {
+            suggestedVerse = data.verse;
+
+            const ref = document.getElementById('suggestionReference');
+            const text = document.getElementById('suggestionText');
+            const conf = document.getElementById('suggestionConfidence');
+
+            ref.textContent = `${data.verse.book} ${data.verse.chapter}:${data.verse.verse}`;
+            text.textContent = data.verse.text;
+
+            // Confidence badge style
+            conf.textContent = `${data.confidence} Confidence`;
+            conf.className = 'confidence-badge';
+            if (data.confidence === 'High') conf.classList.add('confidence-high');
+            else if (data.confidence === 'Medium') conf.classList.add('confidence-medium');
+            else conf.classList.add('confidence-low');
+
+            // Show content, hide placeholder
+            document.getElementById('suggestionPlaceholder').style.display = 'none';
+            document.getElementById('suggestionContent').style.display = 'block';
+        }
+
+        function dismissSuggestion() {
+            resetSuggestionCard();
+        }
+
+        function resetSuggestionCard() {
+            suggestedVerse = null;
+            document.getElementById('suggestionPlaceholder').style.display = 'flex';
+            document.getElementById('suggestionContent').style.display = 'none';
+        }
+
+        function previewSuggestion() {
+            if (suggestedVerse) {
+                selectVerse(suggestedVerse.book, suggestedVerse.chapter, suggestedVerse.verse);
+                // Don't hide suggestion yet?
+            }
+        }
+
+        function displaySuggestion() {
+            if (suggestedVerse) {
+                selectVerse(suggestedVerse.book, suggestedVerse.chapter, suggestedVerse.verse);
+                setTimeout(() => {
+                    displayVerse();
+                }, 200); // Wait for preview to set state
+                dismissSuggestion();
+            }
+        }
+
 
         function requestBooks(filter = '') {
             if (ws && ws.readyState === WebSocket.OPEN) {

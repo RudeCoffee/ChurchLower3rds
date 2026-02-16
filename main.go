@@ -5,11 +5,16 @@ import (
 	"fmt"
 	"log"
 	"net"
-	"os"
 	"net/http"
+	"os"
 	"strconv"
 	"strings"
 	"sync"
+	"time"
+
+	"church-lower-thirds/audio"
+	"church-lower-thirds/search"
+	"church-lower-thirds/speech"
 
 	"github.com/gorilla/websocket"
 )
@@ -110,9 +115,16 @@ var obsClientsMutex sync.Mutex
 var controlClients []*Client
 var controlClientsMutex sync.Mutex
 var bibleData BibleData
+
 // verseIndex maps lowercase book name to a 2D slice of verses [chapterIndex][verseIndex]
 var verseIndex map[string][][]*BibleVerse
 var speakers []string
+
+var audioInput *audio.AudioInput
+var speechEngine *speech.SpeechEngine
+var searchEngine *search.Engine
+var isListening bool
+var listeningMutex sync.Mutex
 
 var currentState struct {
 	Book    string
@@ -214,7 +226,6 @@ func loadBibleData() {
 			// Check if chapter number aligns with index
 			if chapter.Chapter != j+1 {
 				// Fallback to safe sizing if data isn't perfectly sequential
-				// But we verified it is. This is just defensive.
 				if chapter.Chapter > len(chapters) {
 					newChapters := make([][]*BibleVerse, chapter.Chapter)
 					copy(newChapters, chapters)
@@ -247,6 +258,51 @@ func loadBibleData() {
 	}
 
 	log.Printf("Loaded %d Bible books", len(bibleData.Books))
+}
+
+func initializeAI() {
+	var err error
+
+	// 1. Initialize Audio Input
+	audioInput, err = audio.NewAudioInput()
+	if err != nil {
+		log.Printf("Warning: Audio Input initialization failed: %v", err)
+	} else {
+		log.Println("Audio Input initialized")
+	}
+
+	// 2. Initialize Speech Engine (Vosk)
+	// Check for model directory
+	modelPath := "model"
+	if _, err := os.Stat(modelPath); os.IsNotExist(err) {
+		log.Printf("Warning: Vosk model directory '%s' not found. Speech recognition disabled.", modelPath)
+	} else {
+		speechEngine, err = speech.NewSpeechEngine(modelPath, 16000)
+		if err != nil {
+			log.Printf("Warning: Speech Engine initialization failed: %v", err)
+		} else {
+			log.Println("Speech Engine initialized with model from ./model")
+		}
+	}
+
+	// 3. Initialize Search Engine
+	if len(bibleData.Books) > 0 {
+		var verses []search.Verse
+		for _, book := range bibleData.Books {
+			for _, chapter := range book.Chapters {
+				for _, verse := range chapter.Verses {
+					verses = append(verses, search.Verse{
+						Book:    book.Name,
+						Chapter: verse.Chapter,
+						Verse:   verse.Verse,
+						Text:    verse.Text,
+					})
+				}
+			}
+		}
+		searchEngine = search.NewEngine(verses)
+		log.Println("Smart Search Engine initialized with Bible data")
+	}
 }
 
 func searchBible(query string) []BibleVerse {
@@ -875,6 +931,43 @@ func handleControlWebSocket(w http.ResponseWriter, r *http.Request) {
 				}
 			}
 
+		case "get_audio_devices":
+			log.Println("Handling get_audio_devices request")
+			if audioInput == nil {
+				log.Println("Audio input not initialized")
+				client.WriteJSON(struct {
+					Type  string `json:"type"`
+					Error string `json:"Error"`
+				}{Type: "audio_error", Error: "Audio input not initialized (Check server logs for startup errors)"})
+				continue
+			}
+			devices, err := audioInput.ListDevices()
+			if err != nil {
+				log.Printf("Error listing devices: %v", err)
+				client.WriteJSON(struct {
+					Type  string `json:"type"`
+					Error string `json:"Error"`
+				}{Type: "audio_error", Error: err.Error()})
+				continue
+			}
+			log.Printf("Sending %d audio devices to client", len(devices))
+			client.WriteJSON(struct {
+				Type    string             `json:"type"`
+				Devices []audio.DeviceInfo `json:"Devices"`
+			}{Type: "audio_devices", Devices: devices})
+
+		case "start_listening":
+			var req struct {
+				Type string `json:"type"`
+				DeviceIndex int `json:"deviceIndex"`
+			}
+			if err := json.Unmarshal(rawMsg, &req); err == nil {
+				startListening(req.DeviceIndex)
+			}
+
+		case "stop_listening":
+			stopListening()
+
 		default:
 			// Handle regular message (speaker, show/hide, etc.)
 			var msg Message
@@ -892,6 +985,131 @@ func handleControlWebSocket(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
+func startListening(deviceIndex int) {
+	listeningMutex.Lock()
+	defer listeningMutex.Unlock()
+
+	if isListening {
+		return
+	}
+
+	if audioInput == nil || speechEngine == nil {
+		log.Println("Cannot start listening: Audio or Speech engine not ready")
+		return
+	}
+
+	log.Printf("Starting stream on device %d", deviceIndex)
+
+	// Create a counter for debug logging
+	var chunkCount uint64
+	var lastSearchTime time.Time
+
+	err := audioInput.StartStream(deviceIndex, func(data []byte) {
+		chunkCount++
+		if chunkCount%100 == 0 {
+			// Log occasionally to verify data flow without spamming
+			// log.Printf("Processed 100 chunks of audio...")
+		}
+
+		partial, final, isFinal := speechEngine.ProcessAudio(data)
+
+		if isFinal {
+			log.Printf("Final Result: %s", final)
+		}
+
+		// Broadcast transcript
+		if partial != "" || final != "" {
+			msg := struct {
+				Type    string `json:"type"`
+				Partial string `json:"partial"`
+				Final   string `json:"final"`
+			}{
+				Type:    "transcript_update",
+				Partial: partial,
+				Final:   final,
+			}
+
+			controlClientsMutex.Lock()
+			for _, c := range controlClients {
+				c.WriteJSON(msg)
+			}
+			controlClientsMutex.Unlock()
+		}
+
+		// Run search on Final results OR long-enough Partial results
+		// We use a simple word count heuristic for partials to avoid spamming searches on "The..."
+		shouldSearch := false
+		searchText := ""
+
+		if isFinal && len(final) > 10 {
+			shouldSearch = true
+			searchText = final
+		} else if len(partial) > 20 && strings.Count(partial, " ") >= 4 {
+			// If partial is > 20 chars and has at least 4 words, try to search it.
+			// This allows catching verses mid-sentence before the speaker pauses.
+			// THROTTLE: Only search partials every 750ms
+			if time.Since(lastSearchTime) > 750*time.Millisecond {
+				shouldSearch = true
+				searchText = partial
+			}
+		}
+
+		if shouldSearch && searchEngine != nil {
+			lastSearchTime = time.Now()
+			suggestions := searchEngine.Search(searchText)
+			if len(suggestions) > 0 {
+				top := suggestions[0]
+
+				// For partial results, we might want a slightly higher confidence threshold
+				// to avoid jumping around too much?
+				// For now, let's just trust the search engine score.
+
+				// Broadcast suggestion
+				sugMsg := struct {
+					Type       string          `json:"type"`
+					Verse      search.Verse    `json:"verse"`
+					Score      float64         `json:"score"`
+					Confidence string          `json:"confidence"`
+				}{
+					Type:       "verse_suggestion",
+					Verse:      top.Verse,
+					Score:      top.Score,
+					Confidence: top.Confidence,
+				}
+
+				controlClientsMutex.Lock()
+				for _, c := range controlClients {
+					c.WriteJSON(sugMsg)
+				}
+				controlClientsMutex.Unlock()
+			}
+		}
+	})
+
+	if err != nil {
+		log.Printf("Error starting audio stream: %v", err)
+		return
+	}
+
+	isListening = true
+	log.Printf("Started listening on device index %d", deviceIndex)
+}
+
+func stopListening() {
+	listeningMutex.Lock()
+	defer listeningMutex.Unlock()
+
+	if !isListening {
+		return
+	}
+
+	if audioInput != nil {
+		audioInput.StopStream()
+	}
+	isListening = false
+	log.Println("Stopped listening")
+}
+
 func main() {
 	// Load Bible data
 	loadBibleData()
@@ -901,6 +1119,9 @@ func main() {
 
 	// Load high score
 	loadHighScore()
+
+	// Initialize AI components
+	initializeAI()
 
 	// Serve static files
 	http.Handle("/", http.FileServer(http.Dir("./")))
