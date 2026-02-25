@@ -296,6 +296,19 @@
             transition: background-color 0.3s, color 0.3s;
         }
 
+        .verse-text .highlight {
+            background-color: rgba(255, 255, 0, 0.3); /* Yellow highlight */
+            font-weight: bold;
+            color: var(--button-bg);
+            border-radius: 2px;
+            padding: 0 2px;
+        }
+
+        .light-mode .verse-text .highlight {
+            background-color: rgba(255, 255, 0, 0.5);
+            color: #0056b3;
+        }
+
         .search-results {
             max-height: 300px;
             overflow-y: auto;
@@ -701,6 +714,7 @@
         // Voice Assistant Variables
         let isListening = false;
         let suggestedVerse = null;
+        let currentHighConfidenceVerseRef = null;
 
         // Overlay Management
         function showOverlay(id) {
@@ -1241,14 +1255,59 @@
         }
 
         function handleVerseSuggestion(data) {
+            // STABILITY FILTER LOGIC
+            const newVerseRef = `${data.verse.book} ${data.verse.chapter}:${data.verse.verse}`;
+
+            // If we have a locked high confidence verse
+            if (currentHighConfidenceVerseRef) {
+                // If new suggestion is NOT High confidence AND it's a different verse
+                if (data.confidence !== 'High' && newVerseRef !== currentHighConfidenceVerseRef) {
+                    console.log(`Ignoring low/medium confidence suggestion (${newVerseRef}) while locked on High confidence verse (${currentHighConfidenceVerseRef})`);
+                    return;
+                }
+            }
+
+            // Update state
             suggestedVerse = data.verse;
+            if (data.confidence === 'High') {
+                currentHighConfidenceVerseRef = newVerseRef;
+            }
 
             const ref = document.getElementById('suggestionReference');
             const text = document.getElementById('suggestionText');
             const conf = document.getElementById('suggestionConfidence');
 
-            ref.textContent = `${data.verse.book} ${data.verse.chapter}:${data.verse.verse}`;
-            text.textContent = data.verse.text;
+            ref.textContent = newVerseRef;
+
+            // Render text with highlighting
+            const words = data.verse.text.split(' ');
+            const matchedWordsSet = new Set(data.matched_words || []);
+
+            text.innerHTML = words.map((word, index) => {
+                // Clean word for matching (remove punctuation, lowercase) to match backend tokenization logic
+                const cleanWord = word.toLowerCase().replace(/[^a-z0-9]/g, '');
+
+                let isHighlighted = false;
+                // Check if exact token match exists
+                if (cleanWord.length > 2 && matchedWordsSet.has(cleanWord)) {
+                    isHighlighted = true;
+                } else {
+                    // Fallback for complex cases (e.g. "brother's" -> "brothers" vs "brother")
+                    for (const match of matchedWordsSet) {
+                        if (cleanWord.includes(match)) {
+                            isHighlighted = true;
+                            break;
+                        }
+                    }
+                }
+
+                if (isHighlighted) {
+                    return `<span class="highlight" id="sug-word-${index}">${word}</span>`;
+                } else {
+                    return `<span id="sug-word-${index}">${word}</span>`;
+                }
+            }).join(' ');
+
 
             // Confidence badge style
             conf.textContent = `${data.confidence} Confidence`;
@@ -1264,6 +1323,7 @@
 
         function dismissSuggestion() {
             resetSuggestionCard();
+            currentHighConfidenceVerseRef = null; // Unlock on manual dismiss
         }
 
         function resetSuggestionCard() {

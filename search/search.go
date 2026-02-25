@@ -18,9 +18,10 @@ type Verse struct {
 
 // Suggestion represents a search result
 type Suggestion struct {
-	Verse      Verse   `json:"verse"`
-	Score      float64 `json:"score"`
-	Confidence string  `json:"confidence"`
+	Verse        Verse    `json:"verse"`
+	Score        float64  `json:"score"`
+	Confidence   string   `json:"confidence"`
+	MatchedWords []string `json:"matched_words"`
 }
 
 // Engine implements the smart search logic
@@ -163,7 +164,7 @@ func (e *Engine) Search(transcript string) []Suggestion {
 		verseWords := tokenize(verse.Text)
 
 		// Calculate match ratio (how many query words are in verse, in order-ish)
-		matchScore := calculateSequenceScore(queryWords, verseWords)
+		matchScore, matchedWords := calculateSequenceScore(queryWords, verseWords)
 
 		if matchScore > 0.3 { // 30% match
 			confidence := "Low"
@@ -174,9 +175,10 @@ func (e *Engine) Search(transcript string) []Suggestion {
 			}
 
 			suggestions = append(suggestions, Suggestion{
-				Verse:      verse,
-				Score:      matchScore,
-				Confidence: confidence,
+				Verse:        verse,
+				Score:        matchScore,
+				Confidence:   confidence,
+				MatchedWords: matchedWords,
 			})
 		}
 	}
@@ -195,7 +197,7 @@ func (e *Engine) Search(transcript string) []Suggestion {
 
 // calculateSequenceScore calculates how well the query matches the verse
 // A simple approach: longest common subsequence or just matched words / total query words
-func calculateSequenceScore(query []string, verse []string) float64 {
+func calculateSequenceScore(query []string, verse []string) (float64, []string) {
 	// Map verse words to positions
 	verseMap := make(map[string][]int)
 	for i, w := range verse {
@@ -204,6 +206,7 @@ func calculateSequenceScore(query []string, verse []string) float64 {
 
 	matchedCount := 0
 	lastPos := -1
+	var matchedWords []string
 
 	for _, qw := range query {
 		if positions, ok := verseMap[qw]; ok {
@@ -213,6 +216,7 @@ func calculateSequenceScore(query []string, verse []string) float64 {
 				if pos > lastPos {
 					lastPos = pos
 					matchedCount++
+					matchedWords = append(matchedWords, qw)
 					found = true
 					break
 				}
@@ -224,9 +228,10 @@ func calculateSequenceScore(query []string, verse []string) float64 {
 				// Let's just count existence for now but give bonus for order?
 				// Actually, let's stick to simple existence for robustness against paraphrasing.
 				matchedCount++
+				matchedWords = append(matchedWords, qw)
 			}
 		}
 	}
 
-	return float64(matchedCount) / float64(len(query))
+	return float64(matchedCount) / float64(len(query)), matchedWords
 }
