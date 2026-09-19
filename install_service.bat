@@ -1,5 +1,7 @@
 @echo off
 setlocal
+cd /d "%~dp0"
+
 :: Ensure administrative privileges
 net session >nul 2>&1
 if %errorLevel% neq 0 (
@@ -19,7 +21,7 @@ set BIN_PATH=%~dp0church-lower-thirds.exe
 
 if not exist "%BIN_PATH%" (
     echo [ERROR] %BIN_PATH% not found!
-    echo Please run build_windows.bat first.
+    echo Please run build_windows.bat first to compile church-lower-thirds.exe.
     pause
     exit /b 1
 )

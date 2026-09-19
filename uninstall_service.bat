@@ -1,5 +1,7 @@
 @echo off
 setlocal
+cd /d "%~dp0"
+
 net session >nul 2>&1
 if %errorLevel% neq 0 (
     echo [ERROR] This script must be run as Administrator!
