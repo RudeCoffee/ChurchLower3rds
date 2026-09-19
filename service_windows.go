@@ -15,10 +15,9 @@ func (m *churchService) Execute(args []string, r <-chan svc.ChangeRequest, chang
 	const cmdsAccepted = svc.AcceptStop | svc.AcceptShutdown
 	changes <- svc.Status{State: svc.StartPending}
 
-	if len(args) > 0 {
-		if exePath, err := os.Executable(); err == nil {
-			os.Chdir(filepathDir(exePath))
-		}
+	// Always change working directory to executable location so kjv.json and web files load correctly
+	if exePath, err := os.Executable(); err == nil {
+		os.Chdir(filepathDir(exePath))
 	}
 
 	go runServer()
