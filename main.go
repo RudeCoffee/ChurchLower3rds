@@ -1044,11 +1044,9 @@ func startListening(deviceIndex int) {
 		if isFinal && len(final) > 10 {
 			shouldSearch = true
 			searchText = final
-		} else if len(partial) > 20 && strings.Count(partial, " ") >= 4 {
-			// If partial is > 20 chars and has at least 4 words, try to search it.
-			// This allows catching verses mid-sentence before the speaker pauses.
-			// THROTTLE: Only search partials every 750ms
-			if time.Since(lastSearchTime) > 750*time.Millisecond {
+		} else if len(partial) > 15 && strings.Count(partial, " ") >= 2 {
+			// Fast desktop response: search partials after 2+ words, throttled at 200ms
+			if time.Since(lastSearchTime) > 200*time.Millisecond {
 				shouldSearch = true
 				searchText = partial
 			}
@@ -1060,21 +1058,19 @@ func startListening(deviceIndex int) {
 			if len(suggestions) > 0 {
 				top := suggestions[0]
 
-				// For partial results, we might want a slightly higher confidence threshold
-				// to avoid jumping around too much?
-				// For now, let's just trust the search engine score.
-
-				// Broadcast suggestion
+				// Broadcast top suggestion and full suggestions list
 				sugMsg := struct {
-					Type       string          `json:"type"`
-					Verse      search.Verse    `json:"verse"`
-					Score      float64         `json:"score"`
-					Confidence string          `json:"confidence"`
+					Type        string              `json:"type"`
+					Verse       search.Verse        `json:"verse"`
+					Score       float64             `json:"score"`
+					Confidence  string              `json:"confidence"`
+					Suggestions []search.Suggestion `json:"suggestions"`
 				}{
-					Type:       "verse_suggestion",
-					Verse:      top.Verse,
-					Score:      top.Score,
-					Confidence: top.Confidence,
+					Type:        "verse_suggestion",
+					Verse:       top.Verse,
+					Score:       top.Score,
+					Confidence:  top.Confidence,
+					Suggestions: suggestions,
 				}
 
 				controlClientsMutex.Lock()
@@ -1110,7 +1106,7 @@ func stopListening() {
 	log.Println("Stopped listening")
 }
 
-func main() {
+func runServer() {
 	// Load Bible data
 	loadBibleData()
 
@@ -1139,6 +1135,16 @@ func main() {
 	fmt.Println("OBS Browser Source URL: http://localhost:8080/obs.html")
 
 	log.Fatal(http.ListenAndServe(":8080", nil))
+}
+
+func main() {
+	for _, arg := range os.Args[1:] {
+		if arg == "-service" {
+			runService("ChurchLowerThirds")
+			return
+		}
+	}
+	runServer()
 }
 
 func getOutboundIP() string {

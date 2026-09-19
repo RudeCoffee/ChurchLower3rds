@@ -1188,28 +1188,53 @@
             }
         }
 
+        let touchSuggestions = [];
+
         function handleSuggestion(data) {
-            currentSuggestion = data.verse;
+            if (data.suggestions && data.suggestions.length > 0) {
+                touchSuggestions = data.suggestions;
+            } else if (data.verse) {
+                touchSuggestions = [{ verse: data.verse, score: data.score, confidence: data.confidence }];
+            } else {
+                return;
+            }
+
+            currentSuggestion = touchSuggestions[0].verse;
 
             const box = document.getElementById('suggested-verse-box');
             const content = document.getElementById('suggestion-content');
             const placeholder = document.getElementById('suggestion-placeholder');
 
-            const ref = document.getElementById('suggestion-ref');
-            const text = document.getElementById('suggestion-text');
-            const conf = document.getElementById('suggestion-confidence');
+            content.innerHTML = '';
+            touchSuggestions.forEach((sug, idx) => {
+                const item = document.createElement('div');
+                item.style.marginBottom = '12px';
+                if (idx < touchSuggestions.length - 1) {
+                    item.style.borderBottom = '1px solid var(--border-color)';
+                    item.style.paddingBottom = '8px';
+                }
+                item.innerHTML = `
+                    <div style="font-size: 14px; font-weight: bold; color: var(--accent-color);">${idx === 0 ? 'TOP SUGGESTION' : 'ALTERNATIVE'} (${sug.confidence || 'Medium'})</div>
+                    <span class="preview-ref" style="font-size: 20px; color: white;">${sug.verse.book} ${sug.verse.chapter}:${sug.verse.verse}</span>
+                    <div style="font-style: italic; margin-bottom: 10px; font-size: 16px;">${sug.verse.text}</div>
+                    <div style="display: flex; gap: 10px;">
+                        <button class="action-btn btn-nav" style="flex: 1; font-size: 16px; padding: 10px;" onclick="applyTouchSuggestionIndex(${idx}, false)">PREVIEW</button>
+                        <button class="action-btn btn-display" style="flex: 1; font-size: 16px; padding: 10px;" onclick="applyTouchSuggestionIndex(${idx}, true)">DISPLAY</button>
+                    </div>
+                `;
+                content.appendChild(item);
+            });
 
-            ref.textContent = `${data.verse.book} ${data.verse.chapter}:${data.verse.verse}`;
-            text.textContent = data.verse.text;
-
-            if (data.confidence) {
-                conf.textContent = `(${data.confidence})`;
-            }
-
-            // Switch to content view
             box.style.display = 'block';
             content.style.display = 'block';
             placeholder.style.display = 'none';
+        }
+
+        function applyTouchSuggestionIndex(idx, goLive = false) {
+            if (touchSuggestions[idx]) {
+                currentSuggestion = touchSuggestions[idx].verse;
+                applySuggestion(goLive);
+            }
         }
 
         function dismissSuggestion() {

@@ -26,8 +26,9 @@ type Suggestion struct {
 // Engine implements the smart search logic
 type Engine struct {
 	verses        []Verse
-	invertedIndex map[string][]int // word -> []verseIndex
-	wordFreq      map[string]int   // word -> count across all verses
+	verseMap      map[string]map[int]map[int]*Verse // book -> chapter -> verse -> *Verse
+	invertedIndex map[string][]int                  // word -> []verseIndex
+	wordFreq      map[string]int                    // word -> count across all verses
 	totalVerses   int
 	mu            sync.RWMutex
 }
@@ -36,6 +37,7 @@ type Engine struct {
 func NewEngine(verses []Verse) *Engine {
 	e := &Engine{
 		verses:        verses,
+		verseMap:      make(map[string]map[int]map[int]*Verse),
 		invertedIndex: make(map[string][]int),
 		wordFreq:      make(map[string]int),
 		totalVerses:   len(verses),
@@ -44,9 +46,20 @@ func NewEngine(verses []Verse) *Engine {
 	return e
 }
 
-// buildIndex creates the inverted index
+// buildIndex creates the inverted index and verseMap
 func (e *Engine) buildIndex() {
-	for i, v := range e.verses {
+	for i := range e.verses {
+		v := &e.verses[i]
+
+		// Build verse lookup map
+		if e.verseMap[v.Book] == nil {
+			e.verseMap[v.Book] = make(map[int]map[int]*Verse)
+		}
+		if e.verseMap[v.Book][v.Chapter] == nil {
+			e.verseMap[v.Book][v.Chapter] = make(map[int]*Verse)
+		}
+		e.verseMap[v.Book][v.Chapter][v.Verse] = v
+
 		words := tokenize(v.Text)
 		uniqueWords := make(map[string]bool)
 
@@ -58,6 +71,21 @@ func (e *Engine) buildIndex() {
 			}
 		}
 	}
+}
+
+// GetVerseByRef returns a verse pointer by book, chapter, and verse number
+func (e *Engine) GetVerseByRef(book string, chapter int, verseNum int) *Verse {
+	e.mu.RLock()
+	defer e.mu.RUnlock()
+
+	if chMap, ok := e.verseMap[book]; ok {
+		if vMap, ok := chMap[chapter]; ok {
+			if v, ok := vMap[verseNum]; ok {
+				return v
+			}
+		}
+	}
+	return nil
 }
 
 // tokenize splits text into lowercase words, removing punctuation
@@ -97,10 +125,27 @@ var commonStopWords = map[string]bool{
 	"us": true,
 }
 
-// Search finds the best matching verse for the given transcript
+// Search finds the best matching verses for the given transcript
 func (e *Engine) Search(transcript string) []Suggestion {
 	e.mu.RLock()
 	defer e.mu.RUnlock()
+
+	// 1. Check direct spoken scripture reference (e.g. "John three sixteen")
+	if ref := ParseSpokenReference(transcript); ref != nil {
+		if chMap, ok := e.verseMap[ref.Book]; ok {
+			if vMap, ok := chMap[ref.Chapter]; ok {
+				if v, ok := vMap[ref.Verse]; ok {
+					return []Suggestion{
+						{
+							Verse:      *v,
+							Score:      1.0,
+							Confidence: "High",
+						},
+					}
+				}
+			}
+		}
+	}
 
 	words := tokenize(transcript)
 	if len(words) == 0 {
@@ -115,8 +160,8 @@ func (e *Engine) Search(transcript string) []Suggestion {
 		}
 	}
 
-	if len(queryWords) < 3 {
-		return nil // Need enough context
+	if len(queryWords) < 2 {
+		return nil // Reduced from 3 to 2 for improved desktop reactivity
 	}
 
 	// Candidate scoring
@@ -135,14 +180,14 @@ func (e *Engine) Search(transcript string) []Suggestion {
 	}
 
 	// Filter low scores
-	threshold := 5.0
+	threshold := 3.0
 	if e.totalVerses < 100 {
 		threshold = 0.1
 	}
 
 	var topCandidates []int
 	for idx, score := range candidates {
-		if score > threshold { // Threshold
+		if score > threshold {
 			topCandidates = append(topCandidates, idx)
 		}
 	}
@@ -152,8 +197,9 @@ func (e *Engine) Search(transcript string) []Suggestion {
 		return candidates[topCandidates[i]] > candidates[topCandidates[j]]
 	})
 
-	if len(topCandidates) > 20 {
-		topCandidates = topCandidates[:20]
+	// Desktop expanded candidate limit from 20 to 50
+	if len(topCandidates) > 50 {
+		topCandidates = topCandidates[:50]
 	}
 
 	// Refined scoring: Sequence Alignment / Phrase Matching
@@ -162,10 +208,10 @@ func (e *Engine) Search(transcript string) []Suggestion {
 		verse := e.verses[idx]
 		verseWords := tokenize(verse.Text)
 
-		// Calculate match ratio (how many query words are in verse, in order-ish)
+		// Calculate match ratio
 		matchScore := calculateSequenceScore(queryWords, verseWords)
 
-		if matchScore > 0.3 { // 30% match
+		if matchScore > 0.25 { // Lowered threshold to 25% for broader suggestion coverage
 			confidence := "Low"
 			if matchScore > 0.6 {
 				confidence = "High"
@@ -194,9 +240,7 @@ func (e *Engine) Search(transcript string) []Suggestion {
 }
 
 // calculateSequenceScore calculates how well the query matches the verse
-// A simple approach: longest common subsequence or just matched words / total query words
 func calculateSequenceScore(query []string, verse []string) float64 {
-	// Map verse words to positions
 	verseMap := make(map[string][]int)
 	for i, w := range verse {
 		verseMap[w] = append(verseMap[w], i)
@@ -207,7 +251,6 @@ func calculateSequenceScore(query []string, verse []string) float64 {
 
 	for _, qw := range query {
 		if positions, ok := verseMap[qw]; ok {
-			// Find the first position after lastPos
 			found := false
 			for _, pos := range positions {
 				if pos > lastPos {
@@ -218,11 +261,6 @@ func calculateSequenceScore(query []string, verse []string) float64 {
 				}
 			}
 			if !found {
-				// Word exists but not in order, still count it but reset position tracking?
-				// Or just count it as a match but penalize?
-				// For simple fuzzy search, just existence is good, order is better.
-				// Let's just count existence for now but give bonus for order?
-				// Actually, let's stick to simple existence for robustness against paraphrasing.
 				matchedCount++
 			}
 		}
