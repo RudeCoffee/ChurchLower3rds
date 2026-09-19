@@ -546,7 +546,10 @@
     <div class="container assistant-container">
         <div class="assistant-header">
             <h2>🎙️ Voice Assistant</h2>
-            <div>
+            <div style="display: flex; align-items: center; gap: 10px;">
+                <label style="font-size: 12px; font-weight: normal; margin-bottom: 0; display: flex; align-items: center; gap: 4px; cursor: pointer;">
+                    <input type="checkbox" id="autoDisplayToggle" style="width: auto; margin: 0;"> Auto-Display High
+                </label>
                 <button onclick="openAudioSettings()" style="padding: 5px 10px; font-size: 12px;">⚙️</button>
             </div>
         </div>
@@ -565,18 +568,7 @@
             <div id="suggestionPlaceholder" class="suggestion-placeholder-content">
                 Waiting for verse suggestion...
             </div>
-            <div id="suggestionContent" class="suggestion-content">
-                <div class="suggestion-header">
-                    <span style="font-weight: bold; color: var(--button-bg);">Suggested Verse:</span>
-                    <span class="confidence-badge" id="suggestionConfidence">High Confidence</span>
-                </div>
-                <h3 id="suggestionReference" style="margin: 5px 0;"></h3>
-                <div id="suggestionText" class="verse-text" style="font-size: 0.9em; margin-bottom: 10px;"></div>
-                <div>
-                    <button onclick="previewSuggestion()">Preview</button>
-                    <button onclick="displaySuggestion()">Display Live</button>
-                    <button onclick="dismissSuggestion()" style="background-color: #6c757d;">Dismiss</button>
-                </div>
+            <div id="suggestionsList" class="suggestion-content">
             </div>
         </div>
     </div>
@@ -1240,52 +1232,82 @@
             }
         }
 
+        let currentSuggestions = [];
+
         function handleVerseSuggestion(data) {
-            suggestedVerse = data.verse;
+            if (data.suggestions && data.suggestions.length > 0) {
+                currentSuggestions = data.suggestions;
+            } else if (data.verse) {
+                currentSuggestions = [{ verse: data.verse, score: data.score, confidence: data.confidence }];
+            } else {
+                return;
+            }
 
-            const ref = document.getElementById('suggestionReference');
-            const text = document.getElementById('suggestionText');
-            const conf = document.getElementById('suggestionConfidence');
+            suggestedVerse = currentSuggestions[0].verse;
 
-            ref.textContent = `${data.verse.book} ${data.verse.chapter}:${data.verse.verse}`;
-            text.textContent = data.verse.text;
+            const suggestionsList = document.getElementById('suggestionsList');
+            suggestionsList.innerHTML = '';
 
-            // Confidence badge style
-            conf.textContent = `${data.confidence} Confidence`;
-            conf.className = 'confidence-badge';
-            if (data.confidence === 'High') conf.classList.add('confidence-high');
-            else if (data.confidence === 'Medium') conf.classList.add('confidence-medium');
-            else conf.classList.add('confidence-low');
+            currentSuggestions.forEach((sug, idx) => {
+                const item = document.createElement('div');
+                item.style.marginBottom = '12px';
+                item.style.paddingBottom = '8px';
+                if (idx < currentSuggestions.length - 1) {
+                    item.style.borderBottom = '1px solid var(--border-color)';
+                }
 
-            // Show content, hide placeholder
+                const confClass = sug.confidence === 'High' ? 'confidence-high' : (sug.confidence === 'Medium' ? 'confidence-medium' : 'confidence-low');
+
+                item.innerHTML = `
+                    <div class="suggestion-header">
+                        <span style="font-weight: bold; color: var(--button-bg);">${idx === 0 ? 'Top Suggestion:' : 'Alternative:'}</span>
+                        <span class="confidence-badge ${confClass}">${sug.confidence} Confidence</span>
+                    </div>
+                    <h3 style="margin: 4px 0;">${sug.verse.book} ${sug.verse.chapter}:${sug.verse.verse}</h3>
+                    <div class="verse-text" style="font-size: 0.9em; margin-bottom: 8px;">${sug.verse.text}</div>
+                    <div>
+                        <button onclick="previewSuggestionIndex(${idx})" style="padding: 4px 10px; font-size: 12px;">Preview</button>
+                        <button onclick="displaySuggestionIndex(${idx})" style="padding: 4px 10px; font-size: 12px;">Display Live</button>
+                    </div>
+                `;
+                suggestionsList.appendChild(item);
+            });
+
             document.getElementById('suggestionPlaceholder').style.display = 'none';
-            document.getElementById('suggestionContent').style.display = 'block';
+            suggestionsList.style.display = 'block';
+
+            // Auto-Display High Confidence check
+            const autoDisplay = document.getElementById('autoDisplayToggle').checked;
+            if (autoDisplay && currentSuggestions[0].confidence === 'High') {
+                displaySuggestionIndex(0);
+            }
         }
 
-        function dismissSuggestion() {
-            resetSuggestionCard();
+        function previewSuggestionIndex(idx) {
+            if (currentSuggestions[idx]) {
+                const v = currentSuggestions[idx].verse;
+                selectVerse(v.book, v.chapter, v.verse);
+            }
+        }
+
+        function displaySuggestionIndex(idx) {
+            if (currentSuggestions[idx]) {
+                const v = currentSuggestions[idx].verse;
+                selectVerse(v.book, v.chapter, v.verse);
+                setTimeout(() => {
+                    displayVerse();
+                }, 200);
+            }
         }
 
         function resetSuggestionCard() {
             suggestedVerse = null;
+            currentSuggestions = [];
             document.getElementById('suggestionPlaceholder').style.display = 'flex';
-            document.getElementById('suggestionContent').style.display = 'none';
-        }
-
-        function previewSuggestion() {
-            if (suggestedVerse) {
-                selectVerse(suggestedVerse.book, suggestedVerse.chapter, suggestedVerse.verse);
-                // Don't hide suggestion yet?
-            }
-        }
-
-        function displaySuggestion() {
-            if (suggestedVerse) {
-                selectVerse(suggestedVerse.book, suggestedVerse.chapter, suggestedVerse.verse);
-                setTimeout(() => {
-                    displayVerse();
-                }, 200); // Wait for preview to set state
-                dismissSuggestion();
+            const list = document.getElementById('suggestionsList');
+            if (list) {
+                list.style.display = 'none';
+                list.innerHTML = '';
             }
         }
 
