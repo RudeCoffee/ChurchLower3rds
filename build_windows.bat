@@ -13,15 +13,17 @@ set GOARCH=amd64
 where gcc >nul 2>nul
 if %ERRORLEVEL% NEQ 0 goto NO_GCC
 
-:: Check for Vosk CGO headers / library
-if exist "libvosk.dll" (
-    set CGO_CFLAGS=-I.
-    set CGO_LDFLAGS=-L. -lvosk
+:: Check for Vosk CGO headers / library in root folder
+if exist "%CD%\libvosk.dll" (
+    set CGO_CFLAGS=-I"%CD%"
+    set CGO_LDFLAGS=-L"%CD%" -lvosk
     goto WITH_VOSK
 )
-if exist "vosk\lib\vosk_api.h" (
-    set CGO_CFLAGS=-I%CD%\vosk\lib
-    set CGO_LDFLAGS=-L%CD%\vosk\lib -lvosk
+
+:: Check for Vosk CGO headers / library in ./vosk/lib/ folder
+if exist "%CD%\vosk\lib\vosk_api.h" (
+    set CGO_CFLAGS=-I"%CD%\vosk\lib"
+    set CGO_LDFLAGS=-L"%CD%\vosk\lib" -lvosk
     goto WITH_VOSK
 )
 
