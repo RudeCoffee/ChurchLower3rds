@@ -15,7 +15,6 @@ func (m *churchService) Execute(args []string, r <-chan svc.ChangeRequest, chang
 	const cmdsAccepted = svc.AcceptStop | svc.AcceptShutdown
 	changes <- svc.Status{State: svc.StartPending}
 
-	// Change working directory to binary location
 	if len(args) > 0 {
 		if exePath, err := os.Executable(); err == nil {
 			os.Chdir(filepathDir(exePath))

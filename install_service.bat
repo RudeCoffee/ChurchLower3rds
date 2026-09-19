@@ -34,12 +34,18 @@ if %ERRORLEVEL% equ 0 (
     sc description %SERVICE_NAME% "Church Lower Thirds real-time Bible display and voice assistant server."
     echo Starting service...
     sc start %SERVICE_NAME%
-    echo ===================================================
-    echo [SUCCESS] Church Lower Thirds Service installed and started!
-    echo It will now start automatically whenever Windows boots.
-    echo Control Panel: http://localhost:8080/client.html
-    echo OBS Browser Source: http://localhost:8080/obs.html
-    echo ===================================================
+    if %ERRORLEVEL% neq 0 (
+        echo.
+        echo [NOTE] Service registered, but start returned code %ERRORLEVEL%.
+        echo If you are running without GCC/Vosk DLL, ensure church-lower-thirds.exe was built properly.
+    ) else (
+        echo ===================================================
+        echo [SUCCESS] Church Lower Thirds Service installed and started!
+        echo It will now start automatically whenever Windows boots.
+        echo Control Panel: http://localhost:8080/client.html
+        echo OBS Browser Source: http://localhost:8080/obs.html
+        echo ===================================================
+    )
 ) else (
     echo [ERROR] Failed to create service. Error code: %ERRORLEVEL%
 )
